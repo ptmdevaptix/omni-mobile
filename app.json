@@ -1,14 +1,16 @@
 {
   "expo": {
-    "name": "omni-mobile",
+    "name": "Omni Hockey",
     "slug": "omni-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "omnimobile",
+    "scheme": "omnihockey",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omnihockey.app"
     },
     "android": {
       "adaptiveIcon": {

@@ -1,56 +1,53 @@
-# Welcome to your Expo app 👋
+# Omni Hockey — mobile (Expo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Native iOS/iPad (and Android) app for Omni Hockey. It's a **client of the existing omni-hockey API** —
+the web repo (`../omni-hockey`) is the single backend/source of truth. This app renders the same live
+data (`https://omnihockey.com/api/*`) with native UI.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start           # then press `i` for the iOS simulator, or scan the QR with Expo Go on a device
+npx expo start --ios     # boot the iOS simulator directly (needs Xcode)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+iPad is enabled (`ios.supportsTablet`, rotation on). A native build (for TestFlight / App Store / push
+notifications) uses EAS: `npx eas build -p ios` — that step requires the $99/yr Apple Developer Program.
 
-### Other setup steps
+## What's here (scaffold)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- **Expo Router** (file-based routes under `src/app`), TypeScript, light/dark.
+- Root `Stack` → `(tabs)` (**Scores**, **Standings**) + a pushed `teams/[teamId]` detail screen.
+- `src/lib/api.ts` — thin fetch client over the production API + per-league team-id → endpoint mapping
+  (mirrors the web app's league detection: NHL bare abbr; AHL/CHL/NCAA/USHL prefixed).
+- `src/lib/types.ts` — minimal response types for the endpoints used (copied subset).
+- Live wiring: Scores (`/scores`), Standings (`/nhl-standings`), Team header (`/team`, `/ncaa-team`, …),
+  with pull-to-refresh and tap-through to a team. NCAA "points" are hidden (as on the web).
 
-## Learn more
+## Layout
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+src/
+  app/
+    _layout.tsx              root Stack + theme + splash
+    (tabs)/_layout.tsx       tab bar
+    (tabs)/index.tsx         Scores
+    (tabs)/standings.tsx     Standings (NHL; league switcher is an easy next step)
+    teams/[teamId].tsx       Team detail (any league)
+  lib/ { api, types, theme }
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The starter template's demo components under `src/components`, `src/constants`, `src/hooks` are unused
+(replaced by the above) and can be deleted whenever.
 
-## Join the community
+## Suggested next steps
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. **Share types properly.** Instead of copying, extract `omni-hockey/lib/*-types.ts` into a small
+   `@omni/types` package both repos consume, so the API contract stays in sync.
+2. **Harden the API** on the web side (an app token + rate limiting) since it's now a public contract for
+   two clients.
+3. **Native value-adds** (the reason to be in the App Store): push notifications for favorite teams and a
+   Live Activity for in-progress game scores.
+4. **Favorites**: port the web app's localStorage favorites to `AsyncStorage` (+ optional Supabase sync).
+5. **EAS Update** for over-the-air JS/UI updates without App Store review.
