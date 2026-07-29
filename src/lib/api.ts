@@ -2,6 +2,14 @@
 // The web app in ../omni-hockey is the single backend/source of truth — this app is just a client.
 
 export const API_BASE = "https://omnihockey.com/api";
+export const SITE_ORIGIN = "https://omnihockey.com";
+
+// Some logos are omni-hockey's local overrides served as site-relative paths (e.g. "/team-logos/ohl-20.png").
+// Those work in-browser (same origin) but not in the native app — resolve them against the site origin.
+export function resolveLogo(url?: string): string | undefined {
+  if (!url) return undefined;
+  return url.startsWith("/") ? `${SITE_ORIGIN}${url}` : url;
+}
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);

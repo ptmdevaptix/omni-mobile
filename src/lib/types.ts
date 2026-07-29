@@ -14,7 +14,9 @@ export type ScoreGame = {
   network?: string;
 };
 
-export type ScoreTeam = { name?: string; abbr?: string; logo?: string; darkLogo?: string };
+// NHL /scores enriches teams with location + nickname (there is no single `name` field here, unlike
+// /nhl-standings). Display name = `${location} ${nickname}`.trim(), falling back to abbr.
+export type ScoreTeam = { location?: string; nickname?: string; name?: string; abbr?: string; logo?: string; darkLogo?: string };
 
 export type ScoresResponse = {
   games: ScoreGame[];
@@ -36,6 +38,7 @@ export type StandingsTeam = {
   otl: number;
   pts: number;
   clinch?: string;
+  routeId?: string; // set by fetchStandings — the /teams/<id> id for tap-through (prefixed for AHL/CHL)
 };
 
 export type StandingsResponse = { teams: StandingsTeam[]; fetchedAt?: string };

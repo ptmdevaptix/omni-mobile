@@ -1,13 +1,17 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { api, leagueOf, teamHeaderPath } from '@/lib/api';
+import { TeamLogo } from '@/components/team-logo';
+import { useFavorites } from '@/lib/favorites';
 import { useTheme } from '@/lib/theme';
 import type { TeamHeader } from '@/lib/types';
 
 export default function TeamScreen() {
   const t = useTheme();
+  const { isFavorite, toggle } = useFavorites();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
   const [team, setTeam] = useState<TeamHeader | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,11 +38,14 @@ export default function TeamScreen() {
       <Stack.Screen options={{ title: team.abbr || 'Team' }} />
 
       <View style={styles.hero}>
-        {team.logo ? <Image source={{ uri: team.logo }} style={styles.heroLogo} resizeMode="contain" /> : null}
+        {team.logo ? <TeamLogo uri={team.logo} size={64} /> : null}
         <View style={{ flex: 1 }}>
           <Text style={{ color: t.text, fontSize: 22, fontWeight: '800' }}>{team.name}{team.nickname ? ` ${team.nickname}` : ''}</Text>
           <Text style={{ color: t.sub, fontSize: 13, marginTop: 2 }}>{leagueOf(teamId)}{team.division ? ` · ${team.division}` : ''}</Text>
         </View>
+        <Pressable onPress={() => toggle(teamId)} hitSlop={10} accessibilityLabel={isFavorite(teamId) ? 'Remove favorite' : 'Add favorite'}>
+          <SymbolView name={isFavorite(teamId) ? 'star.fill' : 'star'} tintColor={isFavorite(teamId) ? '#f5a623' : t.subtle} size={26} />
+        </Pressable>
       </View>
 
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>

@@ -8,7 +8,6 @@
     "scheme": "omnihockey",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.omnihockey.app"
     },
@@ -34,7 +33,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
