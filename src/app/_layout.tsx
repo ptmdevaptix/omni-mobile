@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
+import { CompactModeProvider } from '@/lib/compact';
 import { FavoritesProvider } from '@/lib/favorites';
 import { queryClient } from '@/lib/query';
 import { ThemeModeProvider, navTheme, useThemeMode } from '@/lib/theme';
@@ -48,9 +49,11 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider>
-        <FavoritesProvider>
-          <RootNav />
-        </FavoritesProvider>
+        <CompactModeProvider>
+          <FavoritesProvider>
+            <RootNav />
+          </FavoritesProvider>
+        </CompactModeProvider>
       </ThemeModeProvider>
     </QueryClientProvider>
   );

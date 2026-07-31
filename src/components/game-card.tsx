@@ -12,11 +12,12 @@ const GOLD = ['#f8e6a8', '#c9a227', '#7d6316', '#e9cd72'] as const;   // dark mo
 const PEWTER = ['#f0f2f4', '#a7abb0', '#5f6368', '#c8ccd0'] as const; // light mode
 
 type Result = 'win' | 'loss' | 'tie' | undefined;
-type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string };
+type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string; compact?: boolean };
 
 // Shared score card. Tapping the card opens the game; tapping a team's logo/name opens that team.
 // `featured` wraps it in a metallic border (favorited teams in the Home "My Teams" section).
-function GameCardBase({ game, teams, featured = false, cardColor }: GameCardProps) {
+// `compact` renders a tighter, abbreviation-based card so two fit side by side (grid mode).
+function GameCardBase({ game, teams, featured = false, cardColor, compact = false }: GameCardProps) {
   const t = useTheme();
   const router = useRouter();
   const away = teams[game.awayTeamId] ?? {};
@@ -34,7 +35,13 @@ function GameCardBase({ game, teams, featured = false, cardColor }: GameCardProp
   const openGame = () => router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
   const openTeam = (id: string) => router.push({ pathname: '/teams/[teamId]', params: { teamId: id } });
 
-  const content = (
+  const content = compact ? (
+    <>
+      <Text style={{ color: live ? t.live : t.sub, fontSize: 10, fontWeight: live ? '700' : '500' }} numberOfLines={1}>{game.statusLabel}</Text>
+      <TeamLine compact team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId)} />
+      <TeamLine compact team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId)} />
+    </>
+  ) : (
     <>
       <View style={styles.leagueRow}>
         <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>{game.top}</Text>
@@ -48,36 +55,36 @@ function GameCardBase({ game, teams, featured = false, cardColor }: GameCardProp
 
   if (featured) {
     return (
-      <Pressable onPress={openGame} style={styles.metalShadow}>
+      <Pressable onPress={openGame} style={[styles.metalShadow, compact && styles.flex1]}>
         <LinearGradient colors={t.mode === 'dark' ? GOLD : PEWTER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.metalFrame}>
-          <View style={[styles.card, styles.cardInner, { backgroundColor: t.card }]}>{content}</View>
+          <View style={[styles.card, styles.cardInner, compact && styles.cardCompact, { backgroundColor: t.card }]}>{content}</View>
         </LinearGradient>
       </Pressable>
     );
   }
 
   return (
-    <Pressable onPress={openGame} style={[styles.card, { backgroundColor: cardColor ?? t.card, borderColor: t.border }]}>{content}</Pressable>
+    <Pressable onPress={openGame} style={[styles.card, compact && styles.cardCompact, compact && styles.flex1, { backgroundColor: cardColor ?? t.card, borderColor: t.border }]}>{content}</Pressable>
   );
 }
 
-function TeamLine({ team, id, score, showScore, result, onPress }: { team: ScoreTeam; id: string; score?: number; showScore: boolean; result?: Result; onPress: () => void }) {
+function TeamLine({ team, id, score, showScore, result, onPress, compact = false }: { team: ScoreTeam; id: string; score?: number; showScore: boolean; result?: Result; onPress: () => void; compact?: boolean }) {
   const t = useTheme();
-  const name = scoreName(team, id);
+  const name = compact ? (team.abbr ?? scoreName(team, id)) : scoreName(team, id);
   const lost = result === 'loss';
   return (
     <View style={styles.teamLine}>
       {/* Tight tap target: only the logo + visible name characters (+ tiny hitSlop). */}
       <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 3, right: 2 }} style={({ pressed }) => [styles.teamTap, pressed && { opacity: 0.55 }]}>
-        <TeamLogo uri={team.logo} size={24} />
-        <Text style={{ color: lost ? t.sub : t.text, fontSize: 16, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{name}</Text>
+        <TeamLogo uri={team.logo} size={compact ? 18 : 24} />
+        <Text style={{ color: lost ? t.sub : t.text, fontSize: compact ? 14 : 16, fontWeight: compact ? '700' : '600', flexShrink: 1 }} numberOfLines={1}>{name}</Text>
       </Pressable>
       {/* Everything to the right of the name (whitespace) falls through to the card → game details. */}
       <View style={{ flex: 1 }} />
       {showScore ? (
         <View style={styles.scoreCell}>
-          {result === 'win' ? <Text style={{ color: t.accent, fontSize: 12, fontWeight: '900' }}>▸</Text> : null}
-          <Text style={{ color: lost ? t.subtle : t.text, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{score ?? 0}</Text>
+          {result === 'win' ? <Text style={{ color: t.accent, fontSize: compact ? 10 : 12, fontWeight: '900' }}>▸</Text> : null}
+          <Text style={{ color: lost ? t.subtle : t.text, fontSize: compact ? 15 : 18, fontWeight: compact ? '800' : '700', fontVariant: ['tabular-nums'] }}>{score ?? 0}</Text>
         </View>
       ) : null}
     </View>
@@ -85,6 +92,7 @@ function TeamLine({ team, id, score, showScore, result, onPress }: { team: Score
 }
 
 // Score cards show the nickname (NHL/AHL/CHL) or the place/school name (NCAA), with graceful fallbacks.
+// Compact cards use the abbreviation instead (see TeamLine).
 function scoreName(team: ScoreTeam, id: string): string {
   if (id.startsWith('ncaa-')) return team.location ?? team.name ?? team.abbr ?? id;
   return team.nickname ?? team.name ?? team.abbr ?? id;
@@ -97,7 +105,7 @@ const teamEq = (x?: ScoreTeam, y?: ScoreTeam) =>
 
 function areEqual(a: GameCardProps, b: GameCardProps): boolean {
   const g1 = a.game, g2 = b.game;
-  if (a.featured !== b.featured || a.cardColor !== b.cardColor) return false;
+  if (a.featured !== b.featured || a.cardColor !== b.cardColor || a.compact !== b.compact) return false;
   if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel
     || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network) return false;
   return teamEq(a.teams[g1.awayTeamId], b.teams[g2.awayTeamId]) && teamEq(a.teams[g1.homeTeamId], b.teams[g2.homeTeamId]);
@@ -107,6 +115,8 @@ export const GameCard = memo(GameCardBase, areEqual);
 
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, gap: 6 },
+  cardCompact: { padding: 9, gap: 3 },
+  flex1: { flex: 1 },
   cardInner: { borderWidth: 0, borderRadius: 12.5 },
   metalFrame: { borderRadius: 14.5, padding: 2 },
   metalShadow: { borderRadius: 14.5, shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
