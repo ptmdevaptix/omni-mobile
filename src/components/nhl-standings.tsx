@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { fetchNhlStandings, leagueColors, type NhlStandingsTeam } from '@/lib/leagues';
+import { usePullRefresh } from '@/lib/pull-refresh';
 import { nhlNickname } from '@/lib/nhl-teams';
 import { useTheme } from '@/lib/theme';
 
@@ -113,6 +114,7 @@ export function NhlStandings({ card }: { card?: string }) {
   const [sortAsc, setSortAsc] = useState(false);
 
   const q = useQuery({ queryKey: ['nhl-standings-full'], queryFn: fetchNhlStandings });
+  const { refreshing, onRefresh } = usePullRefresh(q.refetch);
 
   // Columns that fit without horizontal scroll. Portrait = fixed compact set ending at GA; landscape =
   // greedy fill by priority within the SAFE width (so the last column isn't hidden under the notch).
@@ -144,7 +146,7 @@ export function NhlStandings({ card }: { card?: string }) {
       <ViewFilter value={view} onChange={setView} pill={pill} />
       <ScrollView
         style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
       >
         {sections.map((sec, si) => (
           <View key={si}>

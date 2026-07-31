@@ -11,12 +11,14 @@ import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { fetchNews, timeAgo, type NewsItem } from '@/lib/news';
+import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 
 export default function NewsScreen() {
   const t = useTheme();
   const [view, setView] = useState('My Teams');
   const q = useQuery({ queryKey: ['news'], queryFn: () => fetchNews(50), refetchInterval: 5 * 60_000 });
+  const { refreshing, onRefresh } = usePullRefresh(q.refetch);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -28,9 +30,9 @@ export default function NewsScreen() {
       ) : q.isError ? (
         <StateView kind="error" message="Couldn’t load news." onRetry={() => q.refetch()} />
       ) : view === 'Latest' ? (
-        <Latest items={q.data ?? []} refreshing={q.isRefetching} onRefresh={() => q.refetch()} />
+        <Latest items={q.data ?? []} refreshing={refreshing} onRefresh={onRefresh} />
       ) : (
-        <MyTeams items={q.data ?? []} refreshing={q.isRefetching} onRefresh={() => q.refetch()} />
+        <MyTeams items={q.data ?? []} refreshing={refreshing} onRefresh={onRefresh} />
       )}
     </View>
   );

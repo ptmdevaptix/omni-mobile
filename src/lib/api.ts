@@ -11,10 +11,18 @@ export function resolveLogo(url?: string): string | undefined {
   return url.startsWith("/") ? `${SITE_ORIGIN}${url}` : url;
 }
 
+// Fetch with a hard timeout so a stalled request eventually rejects (→ React Query error state)
+// instead of hanging forever and leaving a loading spinner stuck on screen.
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
-  return (await res.json()) as T;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...init, signal: init?.signal ?? ctrl.signal });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // A /teams/<teamId> id → the correct header endpoint, mirroring the web app's league detection

@@ -7,6 +7,7 @@ import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllScores, HOME_LEAGUE_ORDER } from '@/lib/leagues';
+import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
 
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const { favorites } = useFavorites();
   const q = useQuery({ queryKey: ['all-scores'], queryFn: fetchAllScores, refetchInterval: 30_000 });
 
+  const { refreshing, onRefresh } = usePullRefresh(q.refetch);
   const teams = q.data?.teamsById ?? {};
   const sections = useMemo(() => buildSections(q.data?.games ?? [], favorites), [q.data, favorites]);
 
@@ -38,7 +40,7 @@ export default function HomeScreen() {
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={11}
-          refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
           ListEmptyComponent={<StateView kind="offseason" title="No games today" message="Scores will appear here when games are on." />}
           renderSectionHeader={({ section }) => <SectionHeader title={section.title} live={section.live} />}
           renderItem={({ item, section }) => <GameCard game={item} teams={teams} featured={section.title === 'My Teams'} />}

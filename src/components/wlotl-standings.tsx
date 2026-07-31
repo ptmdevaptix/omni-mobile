@@ -7,6 +7,7 @@ import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { placeName } from '@/lib/format';
 import { fetchStandings, leagueColors, type LeagueId } from '@/lib/leagues';
+import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { StandingsTeam } from '@/lib/types';
 
@@ -60,6 +61,7 @@ export function WlotlStandings({ league, card }: { league: string; card: string 
   const pill = leagueColors(league as LeagueId, t.mode === 'dark').pill;
   const [view, setView] = useState<ViewType>(isQmjhl ? 'conference' : 'division');
   const q = useQuery({ queryKey: ['standings', league], queryFn: () => fetchStandings(league as LeagueId) });
+  const { refreshing, onRefresh } = usePullRefresh(q.refetch);
   const sections = useMemo(() => buildSections(q.data ?? [], view), [q.data, view]);
 
   if (q.isLoading) return <StateView kind="loading" />;
@@ -70,7 +72,7 @@ export function WlotlStandings({ league, card }: { league: string; card: string 
   return (
     <View style={{ flex: 1 }}>
       <ViewFilter value={view} onChange={setView} options={viewOptions} pill={pill} />
-      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}>
+      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}>
         {sections.map((sec, si) => (
           <View key={si}>
             {sec.confHeader ? (

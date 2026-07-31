@@ -13,6 +13,7 @@ import {
   fetchNcaaStandings, leagueById, leagueColors, useLeague,
   type NcaaStandingsTeam,
 } from '@/lib/leagues';
+import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 
 export default function StandingsScreen() {
@@ -38,6 +39,7 @@ function NcaaStandings({ card }: { card: string }) {
   const [view, setView] = useState<NcaaView>('conference');
   const pill = leagueColors('ncaa', t.mode === 'dark').pill;
   const q = useQuery({ queryKey: ['ncaa-standings'], queryFn: fetchNcaaStandings });
+  const { refreshing, onRefresh } = usePullRefresh(q.refetch);
 
   if (q.isLoading) return <StateView kind="loading" />;
   if (q.isError) return <StateView kind="error" message="Couldn’t load standings." onRetry={() => q.refetch()} />;
@@ -52,7 +54,7 @@ function NcaaStandings({ card }: { card: string }) {
   return (
     <View style={{ flex: 1 }}>
       <SegmentedFilter options={['conference', 'league']} value={view} onChange={(v) => setView(v as NcaaView)} pill={pill} />
-      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}>
+      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}>
         {sections.map((sec, si) => (
           <View key={si}>
             <View style={[styles.row, { backgroundColor: superTint, borderColor: t.border }]}>
