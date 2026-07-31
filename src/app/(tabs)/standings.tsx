@@ -1,127 +1,79 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { LeaguePicker } from '@/components/league-picker';
 import { NhlStandings } from '@/components/nhl-standings';
+import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
+import { WlotlStandings } from '@/components/wlotl-standings';
 import {
-  fetchNcaaStandings, fetchStandings, leagueById, useLeague,
+  fetchNcaaStandings, leagueById, leagueColors, useLeague,
   type NcaaStandingsTeam,
 } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
-import type { StandingsTeam } from '@/lib/types';
 
 export default function StandingsScreen() {
   const t = useTheme();
   const { league } = useLeague();
   const kind = leagueById(league).standingsKind;
+  const c = leagueColors(league, t.mode === 'dark');
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <LeaguePicker />
-      {league === 'nhl' ? <NhlStandings /> : kind === 'ncaa' ? <NcaaStandings /> : <WlotlStandings league={league} />}
+      {league === 'nhl' ? <NhlStandings card={c.card} /> : kind === 'ncaa' ? <NcaaStandings card={c.card} /> : <WlotlStandings key={league} league={league} card={c.card} />}
     </View>
   );
 }
 
-// --- NHL / AHL / CHL: W-L-OTL / PTS ------------------------------------------
-function WlotlStandings({ league }: { league: string }) {
+// --- NCAA: grouped by conference (default) or a flat league-wide table -------
+type NcaaView = 'conference' | 'league';
+const ncaaWinPct = (x: NcaaStandingsTeam) => { const g = x.oW + x.oL + x.oT; return g ? (x.oW + x.oT * 0.5) / g : 0; };
+
+function NcaaStandings({ card }: { card: string }) {
   const t = useTheme();
-  const q = useQuery({ queryKey: ['standings', league], queryFn: () => fetchStandings(league as any) });
-  const teams = useMemo(() => [...(q.data ?? [])].sort((a, b) => b.pts - a.pts || b.w - a.w), [q.data]);
-
-  if (q.isLoading) return <StateView kind="loading" />;
-  if (q.isError) return <StateView kind="error" message="Couldn’t load standings." onRetry={() => q.refetch()} />;
-
-  return (
-    <FlatList
-      style={{ flex: 1 }}
-      data={teams}
-      keyExtractor={(x, i) => x.routeId ?? x.abbr ?? String(i)}
-      refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
-      ListEmptyComponent={<StateView kind="empty" title="No standings" message="Not available for this league yet." />}
-      ListHeaderComponent={teams.length ? (
-        <View style={[styles.row, styles.head, { borderColor: t.border }]}>
-          <Text style={[styles.rank, { color: t.sub }]}>#</Text>
-          <Text style={{ flex: 1, color: t.sub, fontSize: 12 }}>Team</Text>
-          <Text style={[styles.stat, { color: t.sub }]}>GP</Text>
-          <Text style={[styles.rec, { color: t.sub }]}>W-L-OTL</Text>
-          <Text style={[styles.stat, { color: t.sub, fontWeight: '700' }]}>PTS</Text>
-        </View>
-      ) : null}
-      renderItem={({ item, index }) => <WlotlRow team={item} rank={index + 1} />}
-    />
-  );
-}
-
-function WlotlRow({ team, rank }: { team: StandingsTeam; rank: number }) {
-  const t = useTheme();
-  return (
-    <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.routeId ?? team.abbr.toLowerCase() } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.row, { borderColor: t.border, backgroundColor: t.card }])}>
-        <Text style={[styles.rank, { color: t.sub }]}>{rank}</Text>
-        <TeamLogo uri={team.logo} size={22} />
-        <Text style={{ flex: 1, color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{team.name}</Text>
-        <Text style={[styles.stat, { color: t.sub }]}>{team.gp}</Text>
-        <Text style={[styles.rec, { color: t.text, fontVariant: ['tabular-nums'] }]}>{team.w}-{team.l}-{team.otl}</Text>
-        <Text style={[styles.stat, { color: t.text, fontWeight: '700', fontVariant: ['tabular-nums'] }]}>{team.pts}</Text>
-      </Pressable>
-    </Link>
-  );
-}
-
-// --- NCAA: conference-based, W-L-T (overall + conference) --------------------
-function NcaaStandings() {
-  const t = useTheme();
+  const [view, setView] = useState<NcaaView>('conference');
+  const pill = leagueColors('ncaa', t.mode === 'dark').pill;
   const q = useQuery({ queryKey: ['ncaa-standings'], queryFn: fetchNcaaStandings });
-  const [conf, setConf] = useState<string | null>(null);
-
-  const groups = q.data ?? [];
-  const active = groups.find((g) => g.conference === conf) ?? groups[0];
 
   if (q.isLoading) return <StateView kind="loading" />;
   if (q.isError) return <StateView kind="error" message="Couldn’t load standings." onRetry={() => q.refetch()} />;
+  const groups = q.data ?? [];
   if (!groups.length) return <StateView kind="empty" title="No standings" message="Not available yet." />;
+
+  const sections = view === 'conference'
+    ? groups.map((g) => ({ label: g.conference, teams: g.teams }))
+    : [{ label: '', teams: [...groups.flatMap((g) => g.teams)].sort((a, b) => ncaaWinPct(b) - ncaaWinPct(a)) }];
+  const superTint = t.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.045)';
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.confRow}>
-        {groups.map((g) => {
-          const on = g.conference === active?.conference;
-          return (
-            <Pressable key={g.conference} onPress={() => setConf(g.conference)}
-              style={[styles.confPill, { borderColor: on ? t.accent : t.border, backgroundColor: on ? t.accent : t.card }]}>
-              <Text style={{ color: on ? t.onAccent : t.sub, fontSize: 12, fontWeight: on ? '700' : '600' }}>{g.conference}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      <FlatList
-        style={{ flex: 1 }}
-        data={active?.teams ?? []}
-        keyExtractor={(x, i) => x.routeId ?? x.abbr ?? String(i)}
-        refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
-        ListHeaderComponent={
-          <View style={[styles.row, styles.head, { borderColor: t.border }]}>
-            <Text style={{ flex: 1, color: t.sub, fontSize: 12 }}>Team</Text>
-            <Text style={[styles.rec, { color: t.sub }]}>Conf</Text>
-            <Text style={[styles.rec, { color: t.sub }]}>Overall</Text>
+      <SegmentedFilter options={['conference', 'league']} value={view} onChange={(v) => setView(v as NcaaView)} pill={pill} />
+      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}>
+        {sections.map((sec, si) => (
+          <View key={si}>
+            <View style={[styles.row, { backgroundColor: superTint, borderColor: t.border }]}>
+              <Text style={{ flex: 1, color: t.sub, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }} numberOfLines={1}>{sec.label || 'Team'}</Text>
+              <Text style={[styles.rec, { color: t.sub }]}>Conf</Text>
+              <Text style={[styles.rec, { color: t.sub }]}>Overall</Text>
+            </View>
+            {sec.teams.map((team, i) => <NcaaRow key={team.routeId ?? i} team={team} card={card} />)}
           </View>
-        }
-        renderItem={({ item }) => <NcaaRow team={item} />}
-      />
+        ))}
+        <View style={{ height: 20 }} />
+      </ScrollView>
     </View>
   );
 }
 
-function NcaaRow({ team }: { team: NcaaStandingsTeam }) {
+function NcaaRow({ team, card }: { team: NcaaStandingsTeam; card: string }) {
   const t = useTheme();
   return (
     <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.routeId } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.row, { borderColor: t.border, backgroundColor: t.card }])}>
+      <Pressable style={StyleSheet.flatten([styles.row, { borderColor: t.border, backgroundColor: card }])}>
         <TeamLogo uri={team.logo} size={22} />
         <Text style={{ flex: 1, color: t.text, fontSize: 15, fontWeight: '600', marginLeft: 8 }} numberOfLines={1}>{team.name}</Text>
         <Text style={[styles.rec, { color: t.text, fontVariant: ['tabular-nums'] }]}>{team.cW}-{team.cL}-{team.cT}</Text>

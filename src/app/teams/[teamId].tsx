@@ -1,11 +1,20 @@
+import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { api, leagueOf, teamHeaderPath } from '@/lib/api';
+import { StateView } from '@/components/state-view';
+import { TeamHome } from '@/components/team/team-home';
+import { TeamProspects } from '@/components/team/team-prospects';
+import { TeamRoster } from '@/components/team/team-roster';
+import { TeamSchedule } from '@/components/team/team-schedule';
+import { TeamStats } from '@/components/team/team-stats';
+import { TeamTabsBar } from '@/components/team/team-tabs-bar';
 import { TeamLogo } from '@/components/team-logo';
+import { api, leagueOf, teamHeaderPath } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
+import { teamTabs, type TeamTab } from '@/lib/team';
 import { useTheme } from '@/lib/theme';
 import type { TeamHeader } from '@/lib/types';
 
@@ -13,78 +22,53 @@ export default function TeamScreen() {
   const t = useTheme();
   const { isFavorite, toggle } = useFavorites();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
-  const [team, setTeam] = useState<TeamHeader | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    api<TeamHeader>(teamHeaderPath(teamId))
-      .then((d) => { if (!cancelled) setTeam(d); })
-      .catch((e) => { if (!cancelled) setError(String(e)); });
-    return () => { cancelled = true; };
-  }, [teamId]);
+  const tabs = teamTabs(teamId);
+  const [tab, setTab] = useState<TeamTab>(tabs[0]);
 
-  if (error) {
-    return <View style={[styles.center, { backgroundColor: t.bg }]}><Text style={{ color: t.sub, padding: 24, textAlign: 'center' }}>Couldn’t load this team.{'\n'}{error}</Text></View>;
-  }
-  if (!team) {
-    return <View style={[styles.center, { backgroundColor: t.bg }]}><ActivityIndicator color={t.accent} /></View>;
-  }
+  const q = useQuery({ queryKey: ['team-header', teamId], queryFn: () => api<TeamHeader>(teamHeaderPath(teamId)) });
+  const team = q.data;
 
-  const last = team.gameStatus?.last;
-  const next = team.gameStatus?.next;
   return (
-    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 14 }}>
-      <Stack.Screen options={{ title: team.abbr || 'Team' }} />
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <Stack.Screen options={{ title: team?.abbr || 'Team' }} />
 
-      <View style={styles.hero}>
-        {team.logo ? <TeamLogo uri={team.logo} size={64} /> : null}
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: t.text, fontSize: 22, fontWeight: '800' }}>{team.name}{team.nickname ? ` ${team.nickname}` : ''}</Text>
-          <Text style={{ color: t.sub, fontSize: 13, marginTop: 2 }}>{leagueOf(teamId)}{team.division ? ` · ${team.division}` : ''}</Text>
-        </View>
-        <Pressable onPress={() => toggle(teamId)} hitSlop={10} accessibilityLabel={isFavorite(teamId) ? 'Remove favorite' : 'Add favorite'}>
-          <SymbolView name={isFavorite(teamId) ? 'star.fill' : 'star'} tintColor={isFavorite(teamId) ? '#f5a623' : t.subtle} size={26} />
-        </Pressable>
-      </View>
+      {q.isError ? (
+        <StateView kind="error" message="Couldn’t load this team." onRetry={() => q.refetch()} />
+      ) : !team ? (
+        <StateView kind="loading" />
+      ) : (
+        <>
+          <View style={[styles.hero, { borderColor: t.border }]}>
+            {team.logo ? <TeamLogo uri={team.logo} size={52} /> : null}
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: t.text, fontSize: 20, fontWeight: '800' }} numberOfLines={1}>
+                {team.name}
+              </Text>
+              <Text style={{ color: t.sub, fontSize: 13, marginTop: 1 }} numberOfLines={1}>
+                {[leagueOf(teamId), team.division, team.record].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <Pressable onPress={() => toggle(teamId)} hitSlop={10} accessibilityLabel={isFavorite(teamId) ? 'Remove favorite' : 'Add favorite'}>
+              <SymbolView name={isFavorite(teamId) ? 'star.fill' : 'star'} tintColor={isFavorite(teamId) ? '#f5a623' : t.subtle} size={26} />
+            </Pressable>
+          </View>
 
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Row t={t} label="Record" value={team.record ?? '—'} />
-        {team.confRecord ? <Row t={t} label="Conference" value={`${team.confRecord}`} /> : null}
-        {/* Points are an NHL/AHL/CHL concept — NCAA returns 0, so hide it there (matches the web app). */}
-        {typeof team.points === 'number' && team.points > 0 ? <Row t={t} label="Points" value={String(team.points)} /> : null}
-      </View>
+          <TeamTabsBar tabs={tabs} value={tab} onChange={setTab} />
 
-      {(last || next) && (
-        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-          {last ? <Row t={t} label="Last" value={`${last.date ? fmtDate(last.date) + ' · ' : ''}${last.awayAbbr} ${last.awayScore}, ${last.homeAbbr} ${last.homeScore}${last.overtime ? ` (${last.overtime})` : ''}`} /> : null}
-          {next ? <Row t={t} label="Next" value={`${fmtDate(next.date)} ${next.isHome ? 'vs' : '@'} ${next.opponentAbbr}`} /> : null}
-        </View>
+          <View style={{ flex: 1 }}>
+            {tab === 'home' ? <TeamHome teamId={teamId} />
+              : tab === 'schedule' ? <TeamSchedule teamId={teamId} />
+              : tab === 'roster' ? <TeamRoster teamId={teamId} />
+              : tab === 'stats' ? <TeamStats teamId={teamId} />
+              : <TeamProspects teamId={teamId} />}
+          </View>
+        </>
       )}
-
-      <Text style={{ color: t.sub, fontSize: 11, textAlign: 'center' }}>Data from omnihockey.com</Text>
-    </ScrollView>
-  );
-}
-
-function Row({ t, label, value }: { t: ReturnType<typeof useTheme>; label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={{ color: t.sub, fontSize: 14 }}>{label}</Text>
-      <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }}>{value}</Text>
     </View>
   );
 }
 
-function fmtDate(d: string): string {
-  const date = new Date(d + 'T12:00:00');
-  return isNaN(date.getTime()) ? d : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  hero: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  heroLogo: { width: 64, height: 64 },
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 10 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
 });

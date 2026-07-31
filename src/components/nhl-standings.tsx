@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
-import { fetchNhlStandings, type NhlStandingsTeam } from '@/lib/leagues';
+import { fetchNhlStandings, leagueColors, type NhlStandingsTeam } from '@/lib/leagues';
 import { nhlNickname } from '@/lib/nhl-teams';
 import { useTheme } from '@/lib/theme';
 
@@ -100,8 +100,9 @@ function buildSections(teams: NhlStandingsTeam[], view: ViewType, col: string, a
   return out;
 }
 
-export function NhlStandings() {
+export function NhlStandings({ card }: { card?: string }) {
   const t = useTheme();
+  const pill = leagueColors('nhl', t.mode === 'dark').pill;
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const portrait = height >= width;
@@ -140,7 +141,7 @@ export function NhlStandings() {
 
   return (
     <View style={{ flex: 1, paddingLeft: insets.left, paddingRight: insets.right }}>
-      <ViewFilter value={view} onChange={setView} />
+      <ViewFilter value={view} onChange={setView} pill={pill} />
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
@@ -149,7 +150,7 @@ export function NhlStandings() {
           <View key={si}>
             {sec.confHeader ? <ConfSuperHeader label={sec.confHeader} /> : null}
             <HeaderRow label={sec.label} cols={visible} teamMin={teamMin} confKey={sec.confKey} sortCol={sortCol} sortAsc={sortAsc} onSort={onSort} />
-            {sec.teams.map((team) => <TeamRow key={team.abbr} team={team} cols={visible} teamMin={teamMin} sortCol={sortCol} />)}
+            {sec.teams.map((team) => <TeamRow key={team.abbr} team={team} cols={visible} teamMin={teamMin} sortCol={sortCol} card={card} />)}
           </View>
         ))}
         <Text style={{ color: t.subtle, fontSize: 11, padding: 12 }}>
@@ -166,16 +167,17 @@ function confTint(theme: ReturnType<typeof useTheme>, confKey?: 'Eastern' | 'Wes
   return { bg: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', fg: theme.sub };
 }
 
-function ViewFilter({ value, onChange }: { value: ViewType; onChange: (v: ViewType) => void }) {
+function ViewFilter({ value, onChange, pill }: { value: ViewType; onChange: (v: ViewType) => void; pill: string }) {
   const t = useTheme();
+  const onText = t.mode === 'dark' ? '#0b0b0b' : '#ffffff';
   return (
-    <View style={[styles.filter, { backgroundColor: t.bg }]}>
+    <View style={styles.filter}>
       <View style={[styles.segment, { backgroundColor: t.card, borderColor: t.border }]}>
         {(['division', 'conference', 'league'] as ViewType[]).map((v) => {
           const on = v === value;
           return (
-            <Pressable key={v} onPress={() => onChange(v)} style={[styles.segItem, on && { backgroundColor: t.accent }]}>
-              <Text style={{ color: on ? t.onAccent : t.sub, fontSize: 13, fontWeight: on ? '700' : '600', textTransform: 'capitalize' }}>{v}</Text>
+            <Pressable key={v} onPress={() => onChange(v)} style={[styles.segItem, on && { backgroundColor: pill }]}>
+              <Text style={{ color: on ? onText : t.sub, fontSize: 13, fontWeight: on ? '700' : '600', textTransform: 'capitalize' }}>{v}</Text>
             </Pressable>
           );
         })}
@@ -201,7 +203,7 @@ function HeaderRow({ label, cols, teamMin, confKey, sortCol, sortAsc, onSort }: 
   const tint = confTint(t, confKey);
   return (
     <View style={[styles.row, { backgroundColor: tint.bg, borderColor: t.border }]}>
-      <Text style={[styles.teamCell, { minWidth: teamMin, color: tint.fg, fontWeight: '700', fontSize: 12 }]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.teamCell, { minWidth: teamMin, color: tint.fg, fontWeight: '700', fontSize: 12, textTransform: 'uppercase' }]} numberOfLines={1}>{label}</Text>
       {cols.map((c) => {
         const active = c.sortable && sortCol === c.key;
         return (
@@ -216,11 +218,11 @@ function HeaderRow({ label, cols, teamMin, confKey, sortCol, sortAsc, onSort }: 
   );
 }
 
-function TeamRow({ team, cols, teamMin, sortCol }: { team: NhlStandingsTeam; cols: Col[]; teamMin: number; sortCol: string }) {
+function TeamRow({ team, cols, teamMin, sortCol, card }: { team: NhlStandingsTeam; cols: Col[]; teamMin: number; sortCol: string; card?: string }) {
   const t = useTheme();
   return (
     <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.routeId } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.row, { backgroundColor: t.card, borderColor: t.border }])}>
+      <Pressable style={StyleSheet.flatten([styles.row, { backgroundColor: card ?? t.card, borderColor: t.border }])}>
         <View style={[styles.teamCell, { minWidth: teamMin }]}>
           <TeamLogo uri={team.logo} size={22} />
           <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>

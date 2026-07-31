@@ -28,7 +28,7 @@ export function StateView({
 
   if (kind === 'loading') {
     return (
-      <View style={[styles.center, { backgroundColor: t.bg }]}>
+      <View style={styles.center}>
         <ActivityIndicator color={t.accent} />
       </View>
     );
@@ -36,7 +36,7 @@ export function StateView({
 
   const d = DEFAULTS[kind];
   return (
-    <View style={[styles.center, { backgroundColor: t.bg }]}>
+    <View style={styles.center}>
       <SymbolView name={d.symbol} size={44} tintColor={t.subtle} type="hierarchical" />
       <Text style={[styles.title, { color: t.text }]}>{title ?? d.title}</Text>
       {message ? <Text style={[styles.msg, { color: t.sub }]}>{message}</Text> : null}

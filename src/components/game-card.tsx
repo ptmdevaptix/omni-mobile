@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
@@ -10,14 +11,28 @@ import type { ScoreGame, ScoreTeam } from '@/lib/types';
 const GOLD = ['#f8e6a8', '#c9a227', '#7d6316', '#e9cd72'] as const;   // dark mode
 const PEWTER = ['#f0f2f4', '#a7abb0', '#5f6368', '#c8ccd0'] as const; // light mode
 
-// Shared score card used by the Home hub and the per-league Scores tab. `featured` wraps it in a
-// metallic border (used for favorited teams in the Home "My Teams" section).
-export function GameCard({ game, teams, featured = false }: { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean }) {
+type Result = 'win' | 'loss' | 'tie' | undefined;
+type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string };
+
+// Shared score card. Tapping the card opens the game; tapping a team's logo/name opens that team.
+// `featured` wraps it in a metallic border (favorited teams in the Home "My Teams" section).
+function GameCardBase({ game, teams, featured = false, cardColor }: GameCardProps) {
   const t = useTheme();
+  const router = useRouter();
   const away = teams[game.awayTeamId] ?? {};
   const home = teams[game.homeTeamId] ?? {};
   const done = game.status === 'FINAL' || game.status === 'LIVE';
   const live = game.status === 'LIVE';
+
+  // Winner/loser only for FINAL games with both scores (dim the loser + wedge at the winner).
+  const final = game.status === 'FINAL' && game.awayScore != null && game.homeScore != null;
+  const aw = game.awayScore ?? 0;
+  const hm = game.homeScore ?? 0;
+  const awayResult: Result = !final ? undefined : aw === hm ? 'tie' : aw > hm ? 'win' : 'loss';
+  const homeResult: Result = !final ? undefined : hm === aw ? 'tie' : hm > aw ? 'win' : 'loss';
+
+  const openGame = () => router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
+  const openTeam = (id: string) => router.push({ pathname: '/teams/[teamId]', params: { teamId: id } });
 
   const content = (
     <>
@@ -25,39 +40,46 @@ export function GameCard({ game, teams, featured = false }: { game: ScoreGame; t
         <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>{game.top}</Text>
         <Text style={{ color: live ? t.live : t.sub, fontSize: 12, fontWeight: live ? '700' : '400' }}>{game.statusLabel}</Text>
       </View>
-      <TeamLine team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} />
-      <TeamLine team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} />
+      <TeamLine team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId)} />
+      <TeamLine team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId)} />
       {game.network ? <Text style={{ color: t.sub, fontSize: 11, marginTop: 4 }}>📺 {game.network}</Text> : null}
     </>
   );
 
   if (featured) {
     return (
-      <Link href={{ pathname: '/teams/[teamId]', params: { teamId: game.homeTeamId } }} asChild>
-        <Pressable style={styles.metalShadow}>
-          <LinearGradient colors={t.mode === 'dark' ? GOLD : PEWTER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.metalFrame}>
-            <View style={[styles.card, styles.cardInner, { backgroundColor: t.card }]}>{content}</View>
-          </LinearGradient>
-        </Pressable>
-      </Link>
+      <Pressable onPress={openGame} style={styles.metalShadow}>
+        <LinearGradient colors={t.mode === 'dark' ? GOLD : PEWTER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.metalFrame}>
+          <View style={[styles.card, styles.cardInner, { backgroundColor: t.card }]}>{content}</View>
+        </LinearGradient>
+      </Pressable>
     );
   }
 
   return (
-    <Link href={{ pathname: '/teams/[teamId]', params: { teamId: game.homeTeamId } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.card, { backgroundColor: t.card, borderColor: t.border }])}>{content}</Pressable>
-    </Link>
+    <Pressable onPress={openGame} style={[styles.card, { backgroundColor: cardColor ?? t.card, borderColor: t.border }]}>{content}</Pressable>
   );
 }
 
-function TeamLine({ team, id, score, showScore }: { team: ScoreTeam; id: string; score?: number; showScore: boolean }) {
+function TeamLine({ team, id, score, showScore, result, onPress }: { team: ScoreTeam; id: string; score?: number; showScore: boolean; result?: Result; onPress: () => void }) {
   const t = useTheme();
   const name = scoreName(team, id);
+  const lost = result === 'loss';
   return (
     <View style={styles.teamLine}>
-      <TeamLogo uri={team.logo} size={24} />
-      <Text style={{ color: t.text, fontSize: 16, fontWeight: '600', flex: 1 }} numberOfLines={1}>{name}</Text>
-      {showScore ? <Text style={{ color: t.text, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{score ?? 0}</Text> : null}
+      {/* Tight tap target: only the logo + visible name characters (+ tiny hitSlop). */}
+      <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 3, right: 2 }} style={({ pressed }) => [styles.teamTap, pressed && { opacity: 0.55 }]}>
+        <TeamLogo uri={team.logo} size={24} />
+        <Text style={{ color: lost ? t.sub : t.text, fontSize: 16, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{name}</Text>
+      </Pressable>
+      {/* Everything to the right of the name (whitespace) falls through to the card → game details. */}
+      <View style={{ flex: 1 }} />
+      {showScore ? (
+        <View style={styles.scoreCell}>
+          {result === 'win' ? <Text style={{ color: t.accent, fontSize: 12, fontWeight: '900' }}>▸</Text> : null}
+          <Text style={{ color: lost ? t.subtle : t.text, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{score ?? 0}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -68,6 +90,21 @@ function scoreName(team: ScoreTeam, id: string): string {
   return team.nickname ?? team.name ?? team.abbr ?? id;
 }
 
+// Skip re-rendering a card when its game + team display data are unchanged — the whole scores list
+// otherwise re-renders on every 30s background refetch, which VirtualizedList flags as slow.
+const teamEq = (x?: ScoreTeam, y?: ScoreTeam) =>
+  x?.logo === y?.logo && x?.name === y?.name && x?.nickname === y?.nickname && x?.location === y?.location && x?.abbr === y?.abbr;
+
+function areEqual(a: GameCardProps, b: GameCardProps): boolean {
+  const g1 = a.game, g2 = b.game;
+  if (a.featured !== b.featured || a.cardColor !== b.cardColor) return false;
+  if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel
+    || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network) return false;
+  return teamEq(a.teams[g1.awayTeamId], b.teams[g2.awayTeamId]) && teamEq(a.teams[g1.homeTeamId], b.teams[g2.homeTeamId]);
+}
+
+export const GameCard = memo(GameCardBase, areEqual);
+
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, gap: 6 },
   cardInner: { borderWidth: 0, borderRadius: 12.5 },
@@ -76,4 +113,6 @@ const styles = StyleSheet.create({
   leagueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   badge: { fontSize: 10, fontWeight: '700', borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   teamLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  teamTap: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  scoreCell: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

@@ -8,11 +8,10 @@ import { useTheme } from '@/lib/theme';
 type Row = { label: string; icon: SymbolViewProps['name']; href?: string };
 const ROWS: Row[] = [
   { label: 'Teams', icon: 'shield.lefthalf.filled', href: '/teams' },
-  { label: 'Favorites', icon: 'star.fill' },
-  { label: 'Schedules', icon: 'calendar' },
-  { label: 'Playoffs & Brackets', icon: 'trophy.fill' },
+  { label: 'Leaders', icon: 'chart.bar.fill', href: '/leaders' },
+  { label: 'Favorites', icon: 'star.fill', href: '/favorites' },
   { label: 'Settings', icon: 'gearshape.fill' },
-  { label: 'About', icon: 'info.circle.fill' },
+  { label: 'About', icon: 'info.circle.fill', href: '/about' },
 ];
 
 export default function MoreScreen() {

@@ -22,10 +22,16 @@ function RootNav() {
   return (
     <ThemeProvider value={navTheme(scheme)}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack>
+      <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="teams/index" options={{ title: 'Teams' }} />
         <Stack.Screen name="teams/[teamId]" options={{ title: 'Team' }} />
+        <Stack.Screen name="games/[gameId]" options={{ title: 'Game' }} />
+        <Stack.Screen name="players/[playerId]" options={{ title: 'Player' }} />
+        <Stack.Screen name="about" options={{ title: 'About' }} />
+        <Stack.Screen name="favorites" options={{ title: 'Favorites' }} />
+        <Stack.Screen name="leaders" options={{ title: 'Leaders' }} />
+        <Stack.Screen name="info/[slug]" options={{ title: 'Info' }} />
         <Stack.Screen name="search" options={{ title: 'Search', presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>

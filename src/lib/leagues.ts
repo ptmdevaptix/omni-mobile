@@ -32,6 +32,27 @@ export const LEAGUES: LeagueConfig[] = [
 
 export const leagueById = (id: LeagueId): LeagueConfig => LEAGUES.find((l) => l.id === id) ?? LEAGUES[0];
 
+// Per-league color set (OHL/WHL/QMJHL share the CHL tint). Each entry is [light, dark]:
+//  - bg:   screen / header / tab-bar shade (faint)
+//  - card: game-card shade (a touch deeper than bg; very dark in dark mode)
+//  - pill: the SELECTED league pill — more saturated/noticeable (darker in light, lighter in dark)
+type LeagueTint = { bg: [string, string]; card: [string, string]; pill: [string, string] };
+const LEAGUE_TINTS: Record<string, LeagueTint> = {
+  nhl:  { bg: ['#eef0f2', '#17181a'], card: ['#e2e5e9', '#0d0e0f'], pill: ['#3a3d42', '#c8ccd2'] }, // neutral gray
+  ahl:  { bg: ['#f7f1e6', '#2b1d08'], card: ['#eee3cf', '#160f04'], pill: ['#9a6a12', '#e6ab3e'] }, // amber
+  chl:  { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red
+  ncaa: { bg: ['#eaeef8', '#111f42'], card: ['#dae2f4', '#0a1024'], pill: ['#2a4a9c', '#6a97ff'] }, // blue
+  // Green reserved for a future league/group (e.g. Euro):
+  //   { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }
+};
+const leagueKey = (id: LeagueId): string => (id === 'ohl' || id === 'whl' || id === 'qmjhl' ? 'chl' : id);
+
+export function leagueColors(id: LeagueId, dark: boolean): { bg: string; card: string; pill: string } {
+  const tint = LEAGUE_TINTS[leagueKey(id)] ?? LEAGUE_TINTS.nhl;
+  const i = dark ? 1 : 0;
+  return { bg: tint.bg[i], card: tint.card[i], pill: tint.pill[i] };
+}
+
 // --- Shared selection (which league is active across the content tabs) -------
 export const LeagueContext = createContext<{ league: LeagueId; setLeague: (id: LeagueId) => void }>({
   league: "nhl",

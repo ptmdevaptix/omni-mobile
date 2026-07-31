@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { GameCard } from '@/components/game-card';
+import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllScores, HOME_LEAGUE_ORDER } from '@/lib/leagues';
@@ -20,22 +21,31 @@ export default function HomeScreen() {
   const teams = q.data?.teamsById ?? {};
   const sections = useMemo(() => buildSections(q.data?.games ?? [], favorites), [q.data, favorites]);
 
-  if (q.isLoading) return <View style={{ flex: 1, backgroundColor: t.bg }}><StateView kind="loading" /></View>;
-  if (q.isError) return <View style={{ flex: 1, backgroundColor: t.bg }}><StateView kind="error" message="Couldn’t load scores." onRetry={() => q.refetch()} /></View>;
-
   return (
-    <SectionList
-      style={{ flex: 1, backgroundColor: t.bg }}
-      contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
-      sections={sections}
-      keyExtractor={(g) => g.id}
-      stickySectionHeadersEnabled={false}
-      refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
-      ListEmptyComponent={<StateView kind="offseason" title="No games today" message="Scores will appear here when games are on." />}
-      renderSectionHeader={({ section }) => <SectionHeader title={section.title} live={section.live} />}
-      renderItem={({ item, section }) => <GameCard game={item} teams={teams} featured={section.title === 'My Teams'} />}
-      ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-    />
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <MyTeamsBar />
+      {q.isLoading ? (
+        <StateView kind="loading" />
+      ) : q.isError ? (
+        <StateView kind="error" message="Couldn’t load scores." onRetry={() => q.refetch()} />
+      ) : (
+        <SectionList
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
+          sections={sections}
+          keyExtractor={(g) => g.id}
+          stickySectionHeadersEnabled={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={11}
+          refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={t.accent} />}
+          ListEmptyComponent={<StateView kind="offseason" title="No games today" message="Scores will appear here when games are on." />}
+          renderSectionHeader={({ section }) => <SectionHeader title={section.title} live={section.live} />}
+          renderItem={({ item, section }) => <GameCard game={item} teams={teams} featured={section.title === 'My Teams'} />}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        />
+      )}
+    </View>
   );
 }
 

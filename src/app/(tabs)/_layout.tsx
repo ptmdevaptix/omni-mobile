@@ -5,7 +5,7 @@ import type { ColorValue } from 'react-native';
 
 import { HeaderActions } from '@/components/header-actions';
 import { OmniHeader } from '@/components/omni-header';
-import { LeagueContext, type LeagueId } from '@/lib/leagues';
+import { LeagueContext, leagueColors, type LeagueId } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
 function TabIcon({ name, color, size }: { name: SymbolViewProps['name']; color: ColorValue; size: number }) {
@@ -16,6 +16,9 @@ export default function TabsLayout() {
   const t = useTheme();
   // Shared league selection across the content tabs (Scores/Standings/Stats/Teams).
   const [league, setLeague] = useState<LeagueId>('nhl');
+  // Scores + Standings tint their chrome (header + tab bar) to the selected league; other tabs stay neutral.
+  const chromeBg = leagueColors(league, t.mode === 'dark').bg;
+  const leagueChrome = { headerStyle: { backgroundColor: chromeBg }, headerShadowVisible: false, tabBarStyle: { backgroundColor: chromeBg } };
 
   return (
     <LeagueContext.Provider value={{ league, setLeague }}>
@@ -34,15 +37,23 @@ export default function TabsLayout() {
         />
         <Tabs.Screen
           name="scores"
-          options={{ title: 'Scores', tabBarIcon: ({ color, size }) => <TabIcon name="sportscourt.fill" color={color} size={size} /> }}
+          options={{
+            title: 'Scores',
+            tabBarIcon: ({ color, size }) => <TabIcon name="sportscourt.fill" color={color} size={size} />,
+            ...leagueChrome,
+          }}
         />
         <Tabs.Screen
           name="standings"
-          options={{ title: 'Standings', tabBarIcon: ({ color, size }) => <TabIcon name="list.number" color={color} size={size} /> }}
+          options={{
+            title: 'Standings',
+            tabBarIcon: ({ color, size }) => <TabIcon name="list.number" color={color} size={size} />,
+            ...leagueChrome,
+          }}
         />
         <Tabs.Screen
-          name="stats"
-          options={{ title: 'Stats', tabBarIcon: ({ color, size }) => <TabIcon name="chart.bar.fill" color={color} size={size} /> }}
+          name="news"
+          options={{ title: 'News', tabBarIcon: ({ color, size }) => <TabIcon name="newspaper.fill" color={color} size={size} /> }}
         />
         <Tabs.Screen
           name="more"
