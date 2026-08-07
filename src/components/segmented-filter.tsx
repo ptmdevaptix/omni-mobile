@@ -3,11 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/lib/theme';
 
 // Pill-colored segmented control used above standings tables (Conference / League / Division …).
-export function SegmentedFilter({ options, value, onChange, pill }: { options: string[]; value: string; onChange: (v: string) => void; pill: string }) {
+// `flush` drops the built-in horizontal padding — use it when the parent already pads its content
+// (e.g. the game-detail ScrollView), so the control lines up full-width with the cards around it.
+export function SegmentedFilter({ options, value, onChange, pill, flush = false }: { options: string[]; value: string; onChange: (v: string) => void; pill: string; flush?: boolean }) {
   const t = useTheme();
   const onText = t.mode === 'dark' ? '#0b0b0b' : '#ffffff';
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, flush && { paddingHorizontal: 0 }]}>
       <View style={[styles.segment, { backgroundColor: t.card, borderColor: t.border }]}>
         {options.map((v) => {
           const on = v === value;

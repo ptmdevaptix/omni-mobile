@@ -13,7 +13,7 @@ import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { fetchPlayer } from '@/lib/player';
 import { useTheme } from '@/lib/theme';
 
-type FavTeam = { id: string; name: string; logo?: string; league: string };
+type FavTeam = { id: string; name: string; logo?: string; darkLogo?: string; league: string };
 type Item = { kind: 'team'; team: FavTeam } | { kind: 'player'; id: string };
 
 export default function FavoritesScreen() {
@@ -25,7 +25,7 @@ export default function FavoritesScreen() {
     const byId = new Map<string, TeamDirectoryEntry>((q.data ?? []).map((tm) => [tm.id, tm]));
     return favorites.map((id) => {
       const tm = byId.get(id);
-      return tm ? { id, name: tm.name, logo: tm.logo, league: tm.league } : { id, name: id, league: leagueOf(id) };
+      return tm ? { id, name: tm.name, logo: tm.logo, darkLogo: tm.darkLogo, league: tm.league } : { id, name: id, league: leagueOf(id) };
     });
   }, [favorites, q.data]);
 
@@ -62,7 +62,7 @@ function FavTeamRow({ team }: { team: FavTeam }) {
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
       <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.id } }} asChild>
         <Pressable style={styles.main}>
-          <TeamLogo uri={team.logo} size={30} />
+          <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={30} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: t.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{team.name}</Text>
             {team.league ? <Text style={{ color: t.sub, fontSize: 12 }}>{team.league}</Text> : null}

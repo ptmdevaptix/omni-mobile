@@ -76,7 +76,7 @@ function TeamLine({ team, id, score, showScore, result, onPress, compact = false
     <View style={styles.teamLine}>
       {/* Tight tap target: only the logo + visible name characters (+ tiny hitSlop). */}
       <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 3, right: 2 }} style={({ pressed }) => [styles.teamTap, pressed && { opacity: 0.55 }]}>
-        <TeamLogo uri={team.logo} size={compact ? 18 : 24} />
+        <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={compact ? 18 : 24} />
         <Text style={{ color: lost ? t.sub : t.text, fontSize: compact ? 14 : 16, fontWeight: compact ? '700' : '600', flexShrink: 1 }} numberOfLines={1}>{name}</Text>
       </Pressable>
       {/* Everything to the right of the name (whitespace) falls through to the card → game details. */}

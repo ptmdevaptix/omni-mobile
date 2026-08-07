@@ -4,6 +4,18 @@
 export const API_BASE = "https://omnihockey.com/api";
 export const SITE_ORIGIN = "https://omnihockey.com";
 
+// Temporary date pin. While the live season feed is quiet, fetch a specific day's *real* games so the
+// app can be exercised against real data (all games from that date, shown as final). Set to null to
+// return to the live "today" feed. The score endpoints (/scores, /ahl-scores, /chl-scores,
+// /ncaa-scores) all accept ?date=YYYY-MM-DD.
+export const SCORES_DATE: string | null = "2026-01-12";
+
+// Append the pinned date to a scores endpoint path (no-op when SCORES_DATE is null).
+export function withScoresDate(path: string): string {
+  if (!SCORES_DATE) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}date=${SCORES_DATE}`;
+}
+
 // Some logos are omni-hockey's local overrides served as site-relative paths (e.g. "/team-logos/ohl-20.png").
 // Those work in-browser (same origin) but not in the native app — resolve them against the site origin.
 export function resolveLogo(url?: string): string | undefined {

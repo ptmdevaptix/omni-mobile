@@ -95,7 +95,7 @@ function TeamResult({ team }: { team: TeamDirectoryEntry }) {
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
       <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.id } }} asChild>
         <Pressable style={styles.main}>
-          <TeamLogo uri={team.logo} size={30} />
+          <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={30} />
           <Text style={{ flex: 1, color: t.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{team.name}</Text>
           <Text style={{ color: t.sub, fontSize: 12, fontWeight: '700' }}>{team.league}</Text>
         </Pressable>

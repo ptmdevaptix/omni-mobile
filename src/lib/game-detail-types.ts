@@ -16,6 +16,18 @@ export type PenaltyInfo = { time: string; teamAbbr: string; player: string; desc
 export type PenaltyPeriod = { label: string; penalties: PenaltyInfo[] };
 export type ThreeStar = { star: number; name: string; teamAbbr: string; goals: number; assists: number; points: number };
 
+// Box-score player rows (from the game-detail `rosters`).
+export type BoxSkater = {
+  playerId: number; name: string; number?: number;
+  goals?: number; assists?: number; plusMinus?: number; pim?: number; toi?: string;
+};
+export type BoxGoalie = {
+  playerId: number; name: string; number?: number;
+  pim?: number; toi?: string; shotsAgainst?: number; saves?: number; goalsAgainst?: number;
+};
+export type TeamBox = { forwards: BoxSkater[]; defense: BoxSkater[]; goalies: BoxGoalie[] };
+export type GameRosters = { away: TeamBox; home: TeamBox };
+
 export type GameDetail = {
   league: string;
   status: 'LIVE' | 'FINAL' | 'UPCOMING';
@@ -31,6 +43,7 @@ export type GameDetail = {
   scoring: ScoringPeriod[];
   penalties: PenaltyPeriod[];
   threeStars?: ThreeStar[];
+  rosters?: GameRosters;
   preview?: string;
 };
 export type GameDetailResponse = { detail?: GameDetail; error?: string; stale?: boolean };

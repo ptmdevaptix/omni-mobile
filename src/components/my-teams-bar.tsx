@@ -23,7 +23,7 @@ export function MyTeamsBar() {
         return (
           <Link key={id} href={{ pathname: '/teams/[teamId]', params: { teamId: id } }} asChild>
             <Pressable style={StyleSheet.flatten([styles.chip, { backgroundColor: t.card, borderColor: t.border }])}>
-              <TeamLogo uri={tm?.logo} size={20} />
+              <TeamLogo uri={tm?.logo} darkUri={tm?.darkLogo} size={20} />
               <Text style={{ color: t.text, fontSize: 13, fontWeight: '700' }}>{tm?.abbr || id.toUpperCase()}</Text>
             </Pressable>
           </Link>

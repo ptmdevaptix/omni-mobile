@@ -100,7 +100,7 @@ function Row({ team, card }: { team: StandingsTeam; card: string }) {
   return (
     <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.routeId ?? team.abbr.toLowerCase() } }} asChild>
       <Pressable style={StyleSheet.flatten([styles.row, { borderColor: t.border, backgroundColor: card }])}>
-        <TeamLogo uri={team.logo} size={22} />
+        <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={22} />
         <Text style={{ flex: 1, color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{placeName(team.name)}</Text>
         <Text style={[styles.stat, { color: t.sub }]}>{team.gp}</Text>
         <Text style={[styles.rec, { color: t.text, fontVariant: ['tabular-nums'] }]}>{team.w}-{team.l}-{team.otl}</Text>

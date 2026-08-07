@@ -226,7 +226,7 @@ function TeamRow({ team, cols, teamMin, sortCol, card }: { team: NhlStandingsTea
     <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.routeId } }} asChild>
       <Pressable style={StyleSheet.flatten([styles.row, { backgroundColor: card ?? t.card, borderColor: t.border }])}>
         <View style={[styles.teamCell, { minWidth: teamMin }]}>
-          <TeamLogo uri={team.logo} size={22} />
+          <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={22} />
           <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>
             {nhlNickname(team.abbr, team.name)}
           </Text>

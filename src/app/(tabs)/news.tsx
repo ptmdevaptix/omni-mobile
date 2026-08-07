@@ -52,6 +52,19 @@ function Latest({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshin
   );
 }
 
+// "My Teams" league grouping order; USHL/other fall to the end.
+const NEWS_LEAGUE_ORDER = ['NHL', 'AHL', 'NCAA', 'OHL', 'WHL', 'QMJHL'];
+function leagueOfId(id: string): string {
+  if (id.startsWith('ahl-')) return 'AHL';
+  if (id.startsWith('chl-ohl-')) return 'OHL';
+  if (id.startsWith('chl-whl-')) return 'WHL';
+  if (id.startsWith('chl-qmjhl-')) return 'QMJHL';
+  if (id.startsWith('ncaa-')) return 'NCAA';
+  if (id.startsWith('ushl-')) return 'USHL';
+  return 'NHL';
+}
+const leagueRank = (lg: string) => { const i = NEWS_LEAGUE_ORDER.indexOf(lg); return i === -1 ? 99 : i; };
+
 function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshing: boolean; onRefresh: () => void }) {
   const t = useTheme();
   const { favorites } = useFavorites();
@@ -59,12 +72,18 @@ function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshi
 
   const sections = useMemo(() => {
     const byId = new Map<string, TeamDirectoryEntry>((teamsQ.data ?? []).map((tm) => [tm.id, tm]));
-    return favorites.map((id) => {
+    const built = favorites.map((id) => {
       const tm = byId.get(id);
       const tagged = items.filter((a) => (a.teamTags ?? []).some((tag) => tag.id === id)).slice(0, 4);
       const fromTag = items.flatMap((a) => a.teamTags ?? []).find((tag) => tag.id === id);
-      return { id, name: tm?.name ?? fromTag?.name ?? id, logo: tm?.logo ?? fromTag?.logo, data: tagged };
+      return { id, name: tm?.name ?? fromTag?.name ?? id, logo: tm?.logo ?? fromTag?.logo, darkLogo: tm?.darkLogo ?? fromTag?.darkLogo, league: leagueOfId(id), data: tagged };
     });
+    // Teams with news first, then by league (NHL→AHL→NCAA→OHL→WHL→QMJHL), then alphabetical by name.
+    return built.sort((a, b) =>
+      (a.data.length ? 0 : 1) - (b.data.length ? 0 : 1)
+      || leagueRank(a.league) - leagueRank(b.league)
+      || a.name.localeCompare(b.name),
+    );
   }, [favorites, teamsQ.data, items]);
 
   if (!favorites.length) {
@@ -81,7 +100,7 @@ function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshi
       renderSectionHeader={({ section }) => (
         <Link href={{ pathname: '/teams/[teamId]', params: { teamId: section.id } }} asChild>
           <Pressable style={StyleSheet.flatten([styles.teamBar, { backgroundColor: t.card, borderColor: t.border }])}>
-            <TeamLogo uri={section.logo} size={22} />
+            <TeamLogo uri={section.logo} darkUri={section.darkLogo} size={22} />
             <Text style={{ color: t.text, fontSize: 14, fontWeight: '800' }} numberOfLines={1}>{section.name}</Text>
           </Pressable>
         </Link>
@@ -109,7 +128,7 @@ function NewsCard({ a }: { a: NewsItem }) {
           <View style={styles.tags}>
             {tags.map((tag) => (
               <View key={tag.id} style={styles.tag}>
-                <TeamLogo uri={tag.logo} size={16} />
+                <TeamLogo uri={tag.logo} darkUri={tag.darkLogo} size={16} />
                 <Text style={{ color: t.sub, fontSize: 11, fontWeight: '700' }}>{tag.abbr}</Text>
               </View>
             ))}

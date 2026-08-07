@@ -2,7 +2,7 @@
 // This is the single source of truth the content tabs (Scores/Standings/Stats/Teams) read from.
 import { createContext, useContext } from "react";
 
-import { api } from "./api";
+import { api, withScoresDate } from "./api";
 import { buildMockScores, isMockableLeague, MOCK_SCORES_ENABLED, MOCKABLE_LEAGUES } from "./mock-scores";
 import type { ScoreGame, ScoresResponse, ScoreTeam, StandingsTeam } from "./types";
 
@@ -65,7 +65,7 @@ export const useLeague = () => useContext(LeagueContext);
 // Scores. CHL sub-leagues share one combined feed (/chl-scores); filter client-side by game.top.
 export async function fetchScores(id: LeagueId): Promise<ScoresResponse> {
   const cfg = leagueById(id);
-  const data = await api<ScoresResponse>(cfg.scoresPath);
+  const data = await api<ScoresResponse>(withScoresDate(cfg.scoresPath));
   let games = data.games ?? [];
   if (cfg.chlCode) {
     const code = cfg.chlCode.toLowerCase();
@@ -159,7 +159,7 @@ export const HOME_LEAGUE_ORDER = ["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA"];
 export async function fetchAllScores(): Promise<{ games: ScoreGame[]; teamsById: Record<string, ScoreTeam> }> {
   const paths = ["/scores", "/ahl-scores", "/chl-scores", "/ncaa-scores"];
   const results = await Promise.all(
-    paths.map((p) => api<ScoresResponse>(p).catch(() => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> }))),
+    paths.map((p) => api<ScoresResponse>(withScoresDate(p)).catch(() => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> }))),
   );
   let games = results.flatMap((r) => r.games ?? []);
   let teamsById: Record<string, ScoreTeam> = Object.assign({}, ...results.map((r) => r.teamsById ?? {}));
@@ -180,7 +180,7 @@ export async function fetchAllScores(): Promise<{ games: ScoreGame[]; teamsById:
 }
 
 // All teams across every league (for search). `id` is already the /teams/<id> route id per league.
-export type TeamDirectoryEntry = { id: string; league: string; name: string; abbr: string; logo?: string; group?: string };
+export type TeamDirectoryEntry = { id: string; league: string; name: string; abbr: string; logo?: string; darkLogo?: string; group?: string };
 export async function fetchAllTeams(): Promise<TeamDirectoryEntry[]> {
   const raw = await api<{ teams?: TeamDirectoryEntry[] }>("/all-teams");
   return raw.teams ?? [];

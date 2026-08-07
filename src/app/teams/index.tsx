@@ -73,7 +73,7 @@ function TeamCard({ team, card }: { team: TeamDirectoryEntry; card: string }) {
   return (
     <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.id } }} asChild>
       <Pressable style={StyleSheet.flatten([styles.card, { backgroundColor: card, borderColor: t.border }])}>
-        <TeamLogo uri={team.logo} size={34} />
+        <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={34} />
         <Text style={{ flex: 1, color: t.text, fontSize: 13, fontWeight: '600' }} numberOfLines={2}>{team.name}</Text>
       </Pressable>
     </Link>

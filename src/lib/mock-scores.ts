@@ -5,7 +5,7 @@ import type { GameDetail, GDTeam, GoalInfo, PeriodScore, ScoringPeriod } from '.
 import type { TeamDirectoryEntry } from './leagues';
 import type { ScoreGame, ScoresResponse, ScoreTeam } from './types';
 
-export const MOCK_SCORES_ENABLED = true;
+export const MOCK_SCORES_ENABLED = false;
 export const MOCKABLE_LEAGUES = ['AHL', 'OHL', 'WHL', 'QMJHL', 'NCAA'];
 
 export function isMockableLeague(label: string): boolean {

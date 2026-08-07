@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { GameBoxScore } from '@/components/game-box-score';
+import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { shortDate, timeOfDay } from '@/lib/format';
@@ -13,6 +16,7 @@ export default function GameScreen() {
   const t = useTheme();
   const { gameId, away, home } = useLocalSearchParams<{ gameId: string; away?: string; home?: string }>();
 
+  const [tab, setTab] = useState('Summary');
   const q = useQuery({
     queryKey: ['game', gameId],
     queryFn: () => fetchGameDetail(gameId),
@@ -20,6 +24,8 @@ export default function GameScreen() {
   });
 
   const g = q.data;
+  const r = g?.rosters;
+  const hasBox = !!r && [r.away, r.home].some((x) => x.forwards.length || x.defense.length || x.goalies.length);
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <Stack.Screen options={{ title: g ? `${g.awayTeam.abbr} @ ${g.homeTeam.abbr}` : 'Game' }} />
@@ -31,7 +37,16 @@ export default function GameScreen() {
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
           <Scoreboard g={g} awayId={away} homeId={home} />
           {g.periodScores?.length ? <LineScore g={g} /> : null}
-          {g.status === 'UPCOMING' ? <Upcoming g={g} /> : <PlayedBody g={g} />}
+          {g.status === 'UPCOMING' ? (
+            <Upcoming g={g} />
+          ) : hasBox ? (
+            <>
+              <SegmentedFilter options={['Summary', 'Box Score']} value={tab} onChange={setTab} pill={t.accent} flush />
+              {tab === 'Box Score' ? <GameBoxScore g={g} /> : <PlayedBody g={g} />}
+            </>
+          ) : (
+            <PlayedBody g={g} />
+          )}
         </ScrollView>
       )}
     </View>
@@ -43,7 +58,7 @@ function TeamName({ team, routeId }: { team: GDTeam; routeId?: string }) {
   const label = `${team.name} ${team.nickname}`.trim() || team.abbr;
   const inner = (
     <View style={styles.teamRow}>
-      <TeamLogo uri={team.logo} size={36} />
+      <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={36} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 17, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
       </View>
@@ -118,6 +133,7 @@ function PlayedBody({ g }: { g: GameDetail }) {
   const t = useTheme();
   const hasScoring = g.scoring?.some((p) => p.goals.length);
   const logoFor = (abbr: string) => (abbr === g.awayTeam.abbr ? g.awayTeam.logo : g.homeTeam.logo);
+  const darkLogoFor = (abbr: string) => (abbr === g.awayTeam.abbr ? g.awayTeam.darkLogo : g.homeTeam.darkLogo);
   return (
     <>
       {g.threeStars?.length ? (
@@ -138,7 +154,7 @@ function PlayedBody({ g }: { g: GameDetail }) {
         {hasScoring ? g.scoring.map((p, pi) => (
           <View key={pi} style={{ marginBottom: 6 }}>
             <Text style={{ color: t.subtle, fontSize: 12, fontWeight: '700', marginTop: 6, marginBottom: 2 }}>{p.label}</Text>
-            {p.goals.length ? p.goals.map((goal, gi) => <GoalRow key={gi} goal={goal} logo={logoFor(goal.teamAbbr)} />) : <Text style={{ color: t.subtle, fontSize: 12 }}>No goals</Text>}
+            {p.goals.length ? p.goals.map((goal, gi) => <GoalRow key={gi} goal={goal} logo={logoFor(goal.teamAbbr)} darkLogo={darkLogoFor(goal.teamAbbr)} />) : <Text style={{ color: t.subtle, fontSize: 12 }}>No goals</Text>}
           </View>
         )) : <Text style={{ color: t.subtle, fontSize: 13 }}>No scoring yet.</Text>}
       </View>
@@ -149,7 +165,7 @@ function PlayedBody({ g }: { g: GameDetail }) {
           {g.penalties.flatMap((p, pi) => p.penalties.map((pen, i) => (
             <View key={`${pi}-${i}`} style={styles.penRow}>
               <Text style={{ color: t.sub, fontSize: 15, fontWeight: '600', width: 46, fontVariant: ['tabular-nums'] }}>{pen.time}</Text>
-              <TeamLogo uri={logoFor(pen.teamAbbr)} size={22} />
+              <TeamLogo uri={logoFor(pen.teamAbbr)} darkUri={darkLogoFor(pen.teamAbbr)} size={22} />
               <Text style={{ flex: 1, color: t.text, fontSize: 13 }} numberOfLines={1}>{pen.player} · {pen.description}</Text>
               <Text style={{ color: t.sub, fontSize: 12 }}>{pen.duration}'</Text>
             </View>
@@ -160,13 +176,13 @@ function PlayedBody({ g }: { g: GameDetail }) {
   );
 }
 
-function GoalRow({ goal, logo }: { goal: GoalInfo; logo?: string }) {
+function GoalRow({ goal, logo, darkLogo }: { goal: GoalInfo; logo?: string; darkLogo?: string }) {
   const t = useTheme();
   const assists = goal.assists?.map((a) => a.name).join(', ');
   return (
     <View style={styles.goalRow}>
       <Text style={{ color: t.sub, fontSize: 16, fontWeight: '600', width: 46, fontVariant: ['tabular-nums'] }}>{goal.time}</Text>
-      <TeamLogo uri={logo} size={24} />
+      <TeamLogo uri={logo} darkUri={darkLogo} size={24} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
           {goal.scorer}{goal.goalType ? <Text style={{ color: t.accent }}> {goal.goalType}</Text> : null}
