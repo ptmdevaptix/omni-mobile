@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Omni Hockey",
-    "slug": "omni-mobile",
+    "slug": "omni-hockey",
     "version": "0.1.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -48,6 +48,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9d880ab1-8a1e-4a83-a5d6-64e7c10749bb"
+      }
+    },
+    "owner": "com.devaptix"
   }
 }
