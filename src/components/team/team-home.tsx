@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { NewsCard } from '@/components/news-card';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { shortDate, timeOfDay } from '@/lib/format';
+import { fetchTeamNews } from '@/lib/news';
 import { fetchTeamHome } from '@/lib/team';
 import type { DivTeam, Leader, MiniGame, TeamHomeData } from '@/lib/team-types';
 import { useTheme } from '@/lib/theme';
@@ -23,9 +25,7 @@ export function TeamHome({ teamId }: { teamId: string }) {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 8 }}>
-      {d.playoffStatus && !d.playoffStatus.hidden && (d.playoffStatus.playoffSeriesStatus || d.playoffStatus.positionLabel) ? (
-        <Text style={{ color: t.sub, fontSize: 13, fontWeight: '600' }}>{d.playoffStatus.playoffSeriesStatus || d.playoffStatus.positionLabel}</Text>
-      ) : null}
+      <TopNewsCard teamId={teamId} />
 
       {games.length ? (
         <Card title="Recent & Upcoming">
@@ -58,6 +58,14 @@ export function TeamHome({ teamId }: { teamId: string }) {
       ) : null}
     </ScrollView>
   );
+}
+
+// Most recent article for this team, shown at the top of the home tab (replaces the old playoff line).
+function TopNewsCard({ teamId }: { teamId: string }) {
+  const q = useQuery({ queryKey: ['team-news-top', teamId], queryFn: () => fetchTeamNews(teamId, 20), staleTime: 5 * 60_000 });
+  const top = q.data?.[0];
+  if (!top) return null;
+  return <NewsCard a={top} />;
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {

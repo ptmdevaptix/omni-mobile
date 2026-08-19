@@ -19,6 +19,29 @@ export const fetchNews = (limit = 30) =>
     (r.items ?? []).map((it) => ({ ...it, title: (it.title ?? '').trim() })), // some feeds prepend whitespace
   );
 
+// League scope for a team's news, derived from its route id (bigger yield than the mixed feed).
+function newsScope(teamId: string): { league?: string; sub?: string } {
+  if (teamId.startsWith('ahl-')) return { league: 'AHL' };
+  if (teamId.startsWith('chl-ohl-')) return { league: 'CHL', sub: 'OHL' };
+  if (teamId.startsWith('chl-whl-')) return { league: 'CHL', sub: 'WHL' };
+  if (teamId.startsWith('chl-qmjhl-')) return { league: 'CHL', sub: 'QMJHL' };
+  if (teamId.startsWith('ncaa-')) return { league: 'NCAA' };
+  if (teamId.startsWith('ushl-')) return {};
+  return { league: 'NHL' };
+}
+
+// Recent news for a single team: scope to its league, then keep only articles tagged with this team.
+export async function fetchTeamNews(teamId: string, limit = 40): Promise<NewsItem[]> {
+  const { league, sub } = newsScope(teamId);
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (league) qs.set('league', league);
+  if (sub) qs.set('sub', sub);
+  const r = await api<{ items?: NewsItem[] }>(`/news?${qs.toString()}`);
+  return (r.items ?? [])
+    .map((it) => ({ ...it, title: (it.title ?? '').trim() }))
+    .filter((a) => (a.teamTags ?? []).some((tag) => tag.id === teamId));
+}
+
 // "3h ago", "2d ago", or a short date for older items.
 export function timeAgo(iso?: string): string {
   if (!iso) return '';

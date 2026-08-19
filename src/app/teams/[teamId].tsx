@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
 import { TeamHome } from '@/components/team/team-home';
+import { TeamNews } from '@/components/team/team-news';
 import { TeamProspects } from '@/components/team/team-prospects';
 import { TeamRoster } from '@/components/team/team-roster';
 import { TeamSchedule } from '@/components/team/team-schedule';
@@ -61,6 +62,7 @@ export default function TeamScreen() {
               : tab === 'schedule' ? <TeamSchedule teamId={teamId} />
               : tab === 'roster' ? <TeamRoster teamId={teamId} />
               : tab === 'stats' ? <TeamStats teamId={teamId} />
+              : tab === 'news' ? <TeamNews teamId={teamId} />
               : <TeamProspects teamId={teamId} />}
           </View>
         </>

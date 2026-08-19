@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 22.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "simulator": {
+      "distribution": "internal",
+      "node": "20.20.0",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "node": "20.20.0",
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "medium"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "node": "20.20.0",
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "medium"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "phil@devaptix.com"
+      }
+    }
+  }
+}
