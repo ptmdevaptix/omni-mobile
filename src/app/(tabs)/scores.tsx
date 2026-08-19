@@ -4,6 +4,7 @@ import { FlatList, RefreshControl, View } from 'react-native';
 
 import { GameCard } from '@/components/game-card';
 import { LeaguePicker } from '@/components/league-picker';
+import { OffseasonBanner } from '@/components/offseason-banner';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { fetchScores, leagueColors, useLeague } from '@/lib/leagues';
@@ -35,6 +36,7 @@ export default function ScoresScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <LeaguePicker />
+      <OffseasonBanner />
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError ? (

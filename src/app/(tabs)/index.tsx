@@ -4,6 +4,7 @@ import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-nativ
 
 import { GameCard } from '@/components/game-card';
 import { MyTeamsBar } from '@/components/my-teams-bar';
+import { OffseasonBanner } from '@/components/offseason-banner';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <MyTeamsBar />
+      <OffseasonBanner />
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError ? (
