@@ -6,7 +6,9 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRootNavigationState, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { API_BASE } from './api';
@@ -89,6 +91,72 @@ export async function postRegistration(token: string, prefs: NotificationPrefs, 
   } catch {
     return false;
   }
+}
+
+// A notification about a game carries its id so tapping it opens that game.
+//
+// ⚠️ iOS surfaces custom data from a `body` key in the APNs payload — top-level keys are IGNORED and
+// `content.data` arrives null. Expo's push service puts whatever you pass as `data` into `body`, so
+// production is fine, but a hand-written payload for `simctl push` must nest it:
+//     {"aps":{...},"body":{"gameId":"nhl-2026020001"}}
+// Verified the hard way: a top-level "gameId" logged `tap payload null` and the tap just opened the app.
+function gameIdFrom(data: unknown): string | null {
+  const d = (data ?? {}) as Record<string, unknown>;
+  const nested = (d.body ?? {}) as Record<string, unknown>;
+  const id = d.gameId ?? nested.gameId;
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+/**
+ * Opens the relevant game when a notification is tapped.
+ *
+ * Two paths, and the second is the one that's easy to miss: the listener only fires while the app is
+ * running, so a tap that cold-starts the app needs getLastNotificationResponseAsync() — otherwise the
+ * app launches to Home and the tap appears to do nothing.
+ */
+const HANDLED_KEY = 'lastHandledNotification';
+
+export function useNotificationTaps() {
+  const router = useRouter();
+  const navState = useRootNavigationState();
+  const [pendingGameId, setPendingGameId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const take = async (response: Notifications.NotificationResponse | null, isReplay: boolean) => {
+      if (!response || cancelled) return;
+      const data = response.notification.request.content.data;
+      if (__DEV__) console.log('[push] tap payload', JSON.stringify(data));
+
+      // getLastNotificationResponseAsync() returns the most recent tap *forever*, not just the one
+      // that launched this session — without this guard, every later launch would re-open a stale
+      // game. The live listener never replays, so it skips the check.
+      const id = response.notification.request.identifier;
+      if (isReplay) {
+        const seen = await AsyncStorage.getItem(HANDLED_KEY).catch(() => null);
+        if (seen === id) return;
+        AsyncStorage.setItem(HANDLED_KEY, id).catch(() => {});
+      }
+
+      const gameId = gameIdFrom(data);
+      if (gameId && !cancelled) setPendingGameId(gameId);
+    };
+
+    Notifications.getLastNotificationResponseAsync().then((r) => take(r, true)).catch(() => {});
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => { void take(r, false); });
+
+    return () => { cancelled = true; sub.remove(); };
+  }, []);
+
+  // Navigation has to wait for the root navigator to mount. On a cold start the tap is delivered
+  // before the Stack exists, and router.push() at that point is silently dropped — which looks
+  // exactly like "the notification just opens the app".
+  useEffect(() => {
+    if (!pendingGameId || !navState?.key) return;
+    router.push({ pathname: '/games/[gameId]', params: { gameId: pendingGameId } });
+    setPendingGameId(null);
+  }, [pendingGameId, navState?.key, router]);
 }
 
 /**
