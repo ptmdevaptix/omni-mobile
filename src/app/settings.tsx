@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { SymbolView } from 'expo-symbols';
-import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
 import { leagueOf } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { NOTIFICATION_EVENTS, useNotificationPrefs } from '@/lib/notification-prefs';
+import { acquirePushToken, pushPermissionStatus, type PushPermission } from '@/lib/push';
 import { useTheme } from '@/lib/theme';
 
 type Row = { id: string; name: string; logo?: string; darkLogo?: string; league: string };
@@ -32,6 +33,31 @@ export default function SettingsScreen() {
 
   const off = !prefs.enabled;
 
+  const [permission, setPermission] = useState<PushPermission | null>(null);
+  useEffect(() => { pushPermissionStatus().then(setPermission).catch(() => {}); }, [prefs.enabled]);
+
+  // Ask for permission at the moment the user opts in — not at launch, when they'd have no idea what
+  // they were agreeing to. A refusal leaves the switch off rather than silently promising alerts that
+  // iOS will never deliver.
+  async function enable(on: boolean) {
+    if (!on) { setEnabled(false); return; }
+    const { status } = await acquirePushToken();
+    if (status === 'granted') { setEnabled(true); return; }
+    if (status === 'denied') {
+      Alert.alert(
+        'Notifications are off for Omni Hockey',
+        'Turn them on in iOS Settings › Notifications › Omni Hockey, then try again.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+    Alert.alert(
+      'Not available here',
+      'Push notifications need a real device — they can’t be delivered to the simulator.',
+      [{ text: 'OK' }],
+    );
+  }
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 24 }}>
 
@@ -44,13 +70,23 @@ export default function SettingsScreen() {
             label="Game notifications"
             detail="For your favorite teams"
             value={prefs.enabled}
-            onChange={setEnabled}
+            onChange={enable}
           />
         </View>
 
-        <Text style={[styles.note, { color: t.subtle }]}>
-          Alerts are sent from our servers while games are on — the app doesn&apos;t need to be open.
-        </Text>
+        {/* The stored flag is intent; this is reality. They diverge when permission is revoked in iOS
+            Settings, or on a simulator, where APNs never issues a token. */}
+        {prefs.enabled && permission && permission !== 'granted' ? (
+          <Text style={[styles.note, { color: t.accent }]}>
+            {permission === 'denied'
+              ? 'Notifications are blocked for Omni Hockey in iOS Settings, so nothing can be delivered.'
+              : 'Push notifications can’t be delivered to the simulator — this needs a real device.'}
+          </Text>
+        ) : (
+          <Text style={[styles.note, { color: t.subtle }]}>
+            Alerts are sent from our servers while games are on — the app doesn&apos;t need to be open.
+          </Text>
+        )}
 
         <Text style={[styles.header, { color: t.sub, marginTop: 8 }]}>WHAT TO SEND</Text>
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, opacity: off ? 0.4 : 1 }]}>

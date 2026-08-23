@@ -8,6 +8,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { CompactModeProvider } from '@/lib/compact';
 import { FavoritesProvider } from '@/lib/favorites';
 import { NotificationPrefsProvider } from '@/lib/notification-prefs';
+import { usePushSync } from '@/lib/push';
 import { queryClient } from '@/lib/query';
 import { ThemeModeProvider, navTheme, useThemeMode } from '@/lib/theme';
 
@@ -21,6 +22,9 @@ function onAppStateChange(status: AppStateStatus) {
 
 function RootNav() {
   const { scheme } = useThemeMode();
+  // Mounted here, not in Settings: favorites also change from the ★ on team pages, and the server's
+  // copy has to follow.
+  usePushSync();
   return (
     <ThemeProvider value={navTheme(scheme)}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
