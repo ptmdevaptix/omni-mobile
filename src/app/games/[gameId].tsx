@@ -7,6 +7,7 @@ import { GameBoxScore } from '@/components/game-box-score';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
+import { canonicalTeamId } from '@/lib/api';
 import { shortDate, timeOfDay } from '@/lib/format';
 import { fetchGameDetail } from '@/lib/game';
 import type { GameDetail, GDTeam, GoalInfo } from '@/lib/game-detail-types';
@@ -65,7 +66,9 @@ function TeamName({ team, routeId }: { team: GDTeam; routeId?: string }) {
     </View>
   );
   if (!routeId) return inner;
-  return <Link href={{ pathname: '/teams/[teamId]', params: { teamId: routeId } }} asChild><Pressable style={{ flex: 1 }}>{inner}</Pressable></Link>;
+  // Canonicalise: these ids come from the scoreboard, where CHL teams are keyed by league code
+  // ("qmjhl-2") rather than the client code the /teams route and its endpoint expect.
+  return <Link href={{ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(routeId) } }} asChild><Pressable style={{ flex: 1 }}>{inner}</Pressable></Link>;
 }
 
 function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; homeId?: string }) {

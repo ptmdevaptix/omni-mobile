@@ -41,7 +41,20 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 // A /teams/<teamId> id → the correct header endpoint, mirroring the web app's league detection
 // (NHL ids are bare abbrs; AHL/CHL/NCAA/USHL are prefixed).
-export function teamHeaderPath(teamId: string): string {
+// The CHL scoreboard emits team ids keyed by LEAGUE code ("qmjhl-2"), while team pages, the team
+// endpoint and favorites all use the canonical /teams id, keyed by CLIENT code ("chl-lhjmq-2").
+// QMJHL is the one where they differ — its client code is lhjmq — and without this a tapped CHL team
+// fell through to /team/qmjhl-2 (the NHL endpoint) and 404'd. Normalising here also stops the ★ from
+// storing a second, incompatible id for a team already favorited from a team page.
+const CHL_CLIENT_CODE: Record<string, string> = { ohl: "ohl", whl: "whl", qmjhl: "lhjmq" };
+
+export function canonicalTeamId(teamId: string): string {
+  const m = /^(ohl|whl|qmjhl)-(.+)$/i.exec(teamId);
+  return m ? `chl-${CHL_CLIENT_CODE[m[1].toLowerCase()]}-${m[2]}` : teamId;
+}
+
+export function teamHeaderPath(rawId: string): string {
+  const teamId = canonicalTeamId(rawId);
   if (teamId.startsWith("ahl-")) return `/ahl-team/${teamId.slice(4)}`;
   if (teamId.startsWith("chl-")) return `/chl-team/${teamId.slice(4)}`;
   if (teamId.startsWith("ncaa-")) return `/ncaa-team/${teamId.slice(5)}`;
@@ -49,7 +62,8 @@ export function teamHeaderPath(teamId: string): string {
   return `/team/${teamId}`;
 }
 
-export function leagueOf(teamId: string): string {
+export function leagueOf(rawId: string): string {
+  const teamId = canonicalTeamId(rawId);
   if (teamId.startsWith("ahl-")) return "AHL";
   if (teamId.startsWith("chl-")) return "CHL";
   if (teamId.startsWith("ncaa-")) return "NCAA";

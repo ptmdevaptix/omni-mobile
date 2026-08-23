@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
+import { canonicalTeamId } from '@/lib/api';
 import { cardDate } from '@/lib/format';
 import { gameLeague } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
@@ -43,7 +44,9 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const homeResult: Result = !final ? undefined : hm === aw ? 'tie' : hm > aw ? 'win' : 'loss';
 
   const openGame = () => router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
-  const openTeam = (id: string) => router.push({ pathname: '/teams/[teamId]', params: { teamId: id } });
+  // Navigate with the canonical id so the team page, its endpoint and the ★ all agree — the CHL
+  // scoreboard's own ids ("qmjhl-2") are not valid /teams ids.
+  const openTeam = (id: string) => router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(id) } });
 
   const content = compact ? (
     <>
