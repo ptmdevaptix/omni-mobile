@@ -5,7 +5,7 @@ import { createContext, useContext } from "react";
 import { api } from "./api";
 import type { ScoreGame, ScoresResponse, ScoreTeam, StandingsTeam } from "./types";
 
-export type LeagueId = "nhl" | "ahl" | "ohl" | "whl" | "qmjhl" | "ncaa";
+export type LeagueId = "nhl" | "ahl" | "ohl" | "whl" | "qmjhl" | "ushl" | "ncaa";
 
 export type LeagueConfig = {
   id: LeagueId;
@@ -16,7 +16,7 @@ export type LeagueConfig = {
   standingsPath: string;
   standingsKind: "wlotl" | "ncaa"; // NHL/AHL/CHL vs NCAA (W-L-T, conference-based)
   statsPath: string;
-  teamKind: "nhl" | "ahl" | "chl" | "ncaa"; // how to build a /teams/<id> route id from a standings row
+  teamKind: "nhl" | "ahl" | "chl" | "ushl" | "ncaa"; // how to build a /teams/<id> route id from a standings row
   hasConferences?: boolean; // NCAA
 };
 
@@ -26,6 +26,7 @@ export const LEAGUES: LeagueConfig[] = [
   { id: "ohl", label: "OHL", name: "Ontario Hockey League", scoresPath: "/chl-scores", chlCode: "OHL", standingsPath: "/ht-standings/ohl", standingsKind: "wlotl", statsPath: "/chl-stats/ohl", teamKind: "chl" },
   { id: "whl", label: "WHL", name: "Western Hockey League", scoresPath: "/chl-scores", chlCode: "WHL", standingsPath: "/ht-standings/whl", standingsKind: "wlotl", statsPath: "/chl-stats/whl", teamKind: "chl" },
   { id: "qmjhl", label: "QMJHL", name: "Quebec Maritimes Junior Hockey League", scoresPath: "/chl-scores", chlCode: "QMJHL", standingsPath: "/ht-standings/qmjhl", standingsKind: "wlotl", statsPath: "/chl-stats/qmjhl", teamKind: "chl" },
+  { id: "ushl", label: "USHL", name: "United States Hockey League", scoresPath: "/ushl-scores", standingsPath: "/ht-standings/ushl", standingsKind: "wlotl", statsPath: "/ht-stats/ushl", teamKind: "ushl" },
   { id: "ncaa", label: "NCAA", name: "NCAA Division I", scoresPath: "/ncaa-scores", standingsPath: "/ncaa-standings", standingsKind: "ncaa", statsPath: "/ncaa-stats", teamKind: "ncaa", hasConferences: true },
 ];
 
@@ -41,8 +42,8 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   ahl:  { bg: ['#f7f1e6', '#2b1d08'], card: ['#eee3cf', '#160f04'], pill: ['#9a6a12', '#e6ab3e'] }, // amber
   chl:  { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red
   ncaa: { bg: ['#eaeef8', '#111f42'], card: ['#dae2f4', '#0a1024'], pill: ['#2a4a9c', '#6a97ff'] }, // blue
-  // Green reserved for a future league/group (e.g. Euro):
-  //   { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }
+  ushl: { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }, // green
+  // NB green was previously reserved for a future Euro group; USHL took it. Pick a new hue for Euro.
 };
 const leagueKey = (id: LeagueId): string => (id === 'ohl' || id === 'whl' || id === 'qmjhl' ? 'chl' : id);
 
@@ -121,6 +122,7 @@ export async function fetchStandings(id: LeagueId): Promise<StandingsTeam[]> {
     routeId:
       cfg.teamKind === "ahl" ? `ahl-${r.teamId}`
       : cfg.teamKind === "chl" ? `chl-${cfg.id}-${r.teamId}`
+      : cfg.teamKind === "ushl" ? `ushl-${r.teamId}`
       : String(r.abbr ?? "").toLowerCase(),
   }));
 }
@@ -176,7 +178,7 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 // Home hub: league grouping order for the aggregated scoreboard, keyed by game.top.
 // FUTURE: make this country-aware — default US = NHL, AHL, NCAA, OHL, WHL, QMJHL (NCAA ahead of CHL);
 // default Canada = NHL, AHL, OHL, WHL, QMJHL, NCAA (CHL ahead of NCAA). Eventually user-customizable order.
-export const HOME_LEAGUE_ORDER = ["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA"];
+export const HOME_LEAGUE_ORDER = ["NHL", "AHL", "OHL", "WHL", "QMJHL", "USHL", "NCAA"];
 
 // Aggregate today's scores across every league into one { games, teamsById } for the Home hub.
 // Each league endpoint is independent — a failure in one doesn't sink the rest.
@@ -185,7 +187,7 @@ export async function fetchAllScores(): Promise<{
   teamsById: Record<string, ScoreTeam>;
 }> {
   const empty = () => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> });
-  const paths = ["/scores", "/ahl-scores", "/chl-scores", "/ncaa-scores"];
+  const paths = ["/scores", "/ahl-scores", "/chl-scores", "/ushl-scores", "/ncaa-scores"];
 
   const live = await Promise.all(paths.map((p) => api<ScoresResponse>(p).catch(empty)));
   const games = live.flatMap((r) => r.games ?? []);
