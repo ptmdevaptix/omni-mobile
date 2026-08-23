@@ -4,8 +4,17 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
+import { cardDate } from '@/lib/format';
+import { gameLeague } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame, ScoreTeam } from '@/lib/types';
+
+// Preseason chip colors. Deliberately amber rather than the theme accent (blue in light, gold in dark) —
+// accent means "tappable" everywhere else in the app, and green is taken by live games.
+const preColors = (mode: 'light' | 'dark') =>
+  mode === 'dark'
+    ? { backgroundColor: '#8a4b0a', color: '#ffe8cc' }
+    : { backgroundColor: '#fde3ad', color: '#7a3f05' };
 
 // Metallic frame gradients (light→mid→shadow→highlight) for the "My Teams" featured cards.
 const GOLD = ['#f8e6a8', '#c9a227', '#7d6316', '#e9cd72'] as const;   // dark mode
@@ -24,6 +33,7 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const home = teams[game.homeTeamId] ?? {};
   const done = game.status === 'FINAL' || game.status === 'LIVE';
   const live = game.status === 'LIVE';
+  const dateLabel = cardDate(game.startTimeUTC, game.gameDate);
 
   // Winner/loser only for FINAL games with both scores (dim the loser + wedge at the winner).
   const final = game.status === 'FINAL' && game.awayScore != null && game.homeScore != null;
@@ -37,15 +47,26 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
 
   const content = compact ? (
     <>
-      <Text style={{ color: live ? t.live : t.sub, fontSize: 10, fontWeight: live ? '700' : '500' }} numberOfLines={1}>{game.statusLabel}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        {game.preseason ? <Text style={[styles.badge, styles.preBadge, styles.preBadgeCompact, preColors(t.mode)]}>PRE</Text> : null}
+        <Text style={{ color: live ? t.live : t.sub, fontSize: 10, fontWeight: live ? '700' : '500', flexShrink: 1 }} numberOfLines={1}>
+          {[dateLabel || null, game.statusLabel].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
       <TeamLine compact team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId)} />
       <TeamLine compact team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId)} />
     </>
   ) : (
     <>
       <View style={styles.leagueRow}>
-        <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>{game.top}</Text>
-        <Text style={{ color: live ? t.live : t.sub, fontSize: 12, fontWeight: live ? '700' : '400' }}>{game.statusLabel}</Text>
+        {/* gameLeague(), not game.top — CHL feeds label every OHL/WHL/QMJHL game as "CHL". */}
+        <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>{gameLeague(game)}</Text>
+        {game.preseason ? <Text style={[styles.badge, styles.preBadge, preColors(t.mode)]}>PRE</Text> : null}
+        {/* statusLabel is time-only ("5:00 PM ET"), which is ambiguous the moment a card isn't from
+            today — and the Home hub now mixes leagues on different days. Date shown only when needed. */}
+        <Text style={{ color: live ? t.live : t.sub, fontSize: 12, fontWeight: live ? '700' : '400' }}>
+          {dateLabel ? `${dateLabel} · ${game.statusLabel}` : game.statusLabel}
+        </Text>
       </View>
       <TeamLine team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId)} />
       <TeamLine team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId)} />
@@ -122,6 +143,10 @@ const styles = StyleSheet.create({
   metalShadow: { borderRadius: 14.5, shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   leagueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   badge: { fontSize: 10, fontWeight: '700', borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  // Filled rather than outlined, so "this result doesn't count" reads at a glance instead of blending
+  // into the league badge beside it.
+  preBadge: { borderWidth: 0, fontWeight: '800', letterSpacing: 0.3 },
+  preBadgeCompact: { fontSize: 9, paddingHorizontal: 4, paddingVertical: 1 },
   teamLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   teamTap: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   scoreCell: { flexDirection: 'row', alignItems: 'center', gap: 4 },

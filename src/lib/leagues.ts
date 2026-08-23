@@ -2,8 +2,7 @@
 // This is the single source of truth the content tabs (Scores/Standings/Stats/Teams) read from.
 import { createContext, useContext } from "react";
 
-import { api, withScoresDate } from "./api";
-import { buildMockScores, isMockableLeague, MOCK_SCORES_ENABLED, MOCKABLE_LEAGUES } from "./mock-scores";
+import { api } from "./api";
 import type { ScoreGame, ScoresResponse, ScoreTeam, StandingsTeam } from "./types";
 
 export type LeagueId = "nhl" | "ahl" | "ohl" | "whl" | "qmjhl" | "ncaa";
@@ -62,20 +61,45 @@ export const useLeague = () => useContext(LeagueContext);
 
 // --- Fetchers ----------------------------------------------------------------
 
-// Scores. CHL sub-leagues share one combined feed (/chl-scores); filter client-side by game.top.
-export async function fetchScores(id: LeagueId): Promise<ScoresResponse> {
+// The real league a game belongs to. `top` is the top-level TAB, not the league: every OHL/WHL/QMJHL
+// game comes back as top: "CHL" (see HT_LEAGUES in the web repo), so filtering on `top` silently drops
+// every CHL game. The game id prefix is the dependable key — it's the same one the web app's
+// /games/{prefix}-{id} routes use. `path` is NOT a safe first choice: it holds the sub-league on CHL
+// feeds (["QMJHL"]) but the conference/division on NHL ones (["EAST","ATL","MET"]).
+const KNOWN_LEAGUES = new Set(["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"]);
+
+export function gameLeague(g: ScoreGame): string {
+  const prefix = (g.id ?? "").split("-")[0].toUpperCase();
+  if (KNOWN_LEAGUES.has(prefix)) return prefix;
+  const fromPath = (g.path?.[0] ?? "").toUpperCase();
+  if (KNOWN_LEAGUES.has(fromPath)) return fromPath;
+  return (g.top ?? "").toUpperCase();
+}
+
+const inLeague = (g: ScoreGame, code: string) => gameLeague(g) === code.toUpperCase();
+
+// Scores for one league. `date` omitted = whatever the feed considers current (the NHL feed answers with
+// the next day that has games, rather than an empty today).
+export async function fetchScores(id: LeagueId, date?: string): Promise<ScoresResponse> {
   const cfg = leagueById(id);
-  const data = await api<ScoresResponse>(withScoresDate(cfg.scoresPath));
-  let games = data.games ?? [];
-  if (cfg.chlCode) {
-    const code = cfg.chlCode.toLowerCase();
-    games = games.filter((g) => (g.top ?? "").toLowerCase() === code);
-  }
-  // Prototype: fill empty offseason feeds with mock same-league matchups.
-  if (games.length === 0 && isMockableLeague(cfg.label)) {
-    return buildMockScores(cfg.label, await fetchAllTeams());
-  }
-  return { ...data, games };
+  const r = await api<ScoresResponse>(date ? `${cfg.scoresPath}?date=${date}` : cfg.scoresPath);
+  const games = cfg.chlCode ? (r.games ?? []).filter((g) => inLeague(g, cfg.chlCode!)) : (r.games ?? []);
+  return { ...r, games };
+}
+
+// Days that actually have games, for the Scores pager. Hockey schedules are sparse — paging by calendar
+// day would walk users through empty screens (39 of them, right now, between today and NHL opening
+// night), so the pager's unit is a *slate*: one swipe = one day that has games.
+//
+// NCAA is not covered by the endpoint (no season-wide feed upstream); it answers { supported: false },
+// and the caller falls back to the single live-plus-pin view.
+export async function fetchGameDays(id: LeagueId, from: string, to: string): Promise<string[]> {
+  const cfg = leagueById(id);
+  const top = cfg.chlCode ? "CHL" : cfg.label;
+  const qs = new URLSearchParams({ from, to, top, ...(cfg.chlCode ? { sub: cfg.chlCode } : {}) });
+  const r = await api<{ days?: Record<string, number>; supported?: boolean }>(`/game-days?${qs.toString()}`);
+  if (r.supported === false) return [];
+  return Object.keys(r.days ?? {}).sort();
 }
 
 // W-L-OTL standings (NHL/AHL/CHL), normalized to StandingsTeam with a tap-through routeId.
@@ -156,26 +180,16 @@ export const HOME_LEAGUE_ORDER = ["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA"];
 
 // Aggregate today's scores across every league into one { games, teamsById } for the Home hub.
 // Each league endpoint is independent — a failure in one doesn't sink the rest.
-export async function fetchAllScores(): Promise<{ games: ScoreGame[]; teamsById: Record<string, ScoreTeam> }> {
+export async function fetchAllScores(): Promise<{
+  games: ScoreGame[];
+  teamsById: Record<string, ScoreTeam>;
+}> {
+  const empty = () => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> });
   const paths = ["/scores", "/ahl-scores", "/chl-scores", "/ncaa-scores"];
-  const results = await Promise.all(
-    paths.map((p) => api<ScoresResponse>(withScoresDate(p)).catch(() => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> }))),
-  );
-  let games = results.flatMap((r) => r.games ?? []);
-  let teamsById: Record<string, ScoreTeam> = Object.assign({}, ...results.map((r) => r.teamsById ?? {}));
 
-  // Prototype: for any mockable league with no real games today, inject a mock slate.
-  if (MOCK_SCORES_ENABLED) {
-    const missing = MOCKABLE_LEAGUES.filter((lg) => !games.some((g) => (g.top ?? "").toUpperCase() === lg));
-    if (missing.length) {
-      const all = await fetchAllTeams();
-      for (const lg of missing) {
-        const m = buildMockScores(lg, all);
-        games = games.concat(m.games);
-        teamsById = { ...teamsById, ...m.teamsById };
-      }
-    }
-  }
+  const live = await Promise.all(paths.map((p) => api<ScoresResponse>(p).catch(empty)));
+  const games = live.flatMap((r) => r.games ?? []);
+  const teamsById: Record<string, ScoreTeam> = Object.assign({}, ...live.map((r) => r.teamsById ?? {}));
   return { games, teamsById };
 }
 

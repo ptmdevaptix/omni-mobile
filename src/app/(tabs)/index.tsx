@@ -4,11 +4,10 @@ import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-nativ
 
 import { GameCard } from '@/components/game-card';
 import { MyTeamsBar } from '@/components/my-teams-bar';
-import { OffseasonBanner } from '@/components/offseason-banner';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
-import { fetchAllScores, HOME_LEAGUE_ORDER } from '@/lib/leagues';
+import { fetchAllScores, gameLeague, HOME_LEAGUE_ORDER } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -38,7 +37,6 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <MyTeamsBar />
-      <OffseasonBanner />
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError ? (
@@ -94,7 +92,7 @@ function buildSections(games: ScoreGame[], favorites: string[]): Section[] {
 
   const remaining = games.filter((g) => !shown.has(g.id));
   for (const lg of HOME_LEAGUE_ORDER) {
-    const grp = remaining.filter((g) => (g.top ?? '').toUpperCase() === lg);
+    const grp = remaining.filter((g) => gameLeague(g) === lg);
     if (grp.length) sections.push({ title: lg, data: grp });
   }
   return sections;

@@ -4,7 +4,10 @@
 
 export type ScoreGame = {
   id: string;
-  top: string; // league: "NHL" | "AHL" | "OHL" | "WHL" | "QMJHL" | "NCAA" | ...
+  // Top-level league tab: "NHL" | "AHL" | "CHL" | "NCAA" | "USHL". NOTE this is *not* the sub-league —
+  // OHL/WHL/QMJHL games all carry top: "CHL". Use gameLeague() from lib/leagues to get the real one.
+  top: string;
+  path?: string[]; // breadcrumb; path[0] is the sub-league for CHL feeds (e.g. ["QMJHL"])
   awayTeamId: string;
   homeTeamId: string;
   status: "UPCOMING" | "LIVE" | "FINAL" | string;
@@ -12,6 +15,9 @@ export type ScoreGame = {
   awayScore?: number;
   homeScore?: number;
   network?: string;
+  startTimeUTC?: string; // ISO puck drop — the reliable way to date a game (statusLabel is time-only)
+  gameDate?: string;     // YYYY-MM-DD — feeds that know the day but not the time (seeded NCAA schedules)
+  preseason?: boolean; // HockeyTech career=0 seasons (exhibition/pre-season)
 };
 
 // NHL /scores enriches teams with location + nickname (there is no single `name` field here, unlike
