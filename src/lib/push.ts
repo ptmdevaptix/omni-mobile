@@ -33,8 +33,9 @@ export type PushPermission = 'granted' | 'denied' | 'unavailable';
  * tested on hardware (i.e. a TestFlight build).
  */
 export async function acquirePushToken(): Promise<{ status: PushPermission; token?: string }> {
-  if (!Device.isDevice) return { status: 'unavailable' };
-
+  // Permission is asked for even on a simulator: only the *token* is impossible there, and having
+  // iOS authorisation on record is what lets `xcrun simctl push <device> <bundle-id> payload.apns`
+  // render notifications locally — the only way to review copy and tap behaviour without hardware.
   const existing = await Notifications.getPermissionsAsync();
   let granted = existing.granted;
   if (!granted && existing.canAskAgain) {
@@ -44,6 +45,8 @@ export async function acquirePushToken(): Promise<{ status: PushPermission; toke
     granted = asked.granted;
   }
   if (!granted) return { status: 'denied' };
+
+  if (!Device.isDevice) return { status: 'unavailable' };
 
   try {
     // Recommended to pass explicitly even though it falls back to expoConfig.extra.eas.projectId.
