@@ -31,7 +31,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "phil@devaptix.com"
+        "appleId": "phil@devaptix.com",
+        "ascAppId": "6803269837",
+        "appleTeamId": "C28GGHZV37"
       }
     }
   }
