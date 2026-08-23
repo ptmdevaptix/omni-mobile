@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 
 import { api } from "./api";
+import { detectRegion, type Region } from "./region";
 import type { ScoreGame, ScoresResponse, ScoreTeam, StandingsTeam } from "./types";
 
 export type LeagueId = "nhl" | "ahl" | "ohl" | "whl" | "qmjhl" | "ushl" | "ncaa";
@@ -178,7 +179,29 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 // Home hub: league grouping order for the aggregated scoreboard, keyed by game.top.
 // FUTURE: make this country-aware — default US = NHL, AHL, NCAA, OHL, WHL, QMJHL (NCAA ahead of CHL);
 // default Canada = NHL, AHL, OHL, WHL, QMJHL, NCAA (CHL ahead of NCAA). Eventually user-customizable order.
-export const HOME_LEAGUE_ORDER = ["NHL", "AHL", "OHL", "WHL", "QMJHL", "USHL", "NCAA"];
+// Region-aware league order, mirroring the web app's lib/league-order.ts. US users lead with the
+// leagues they follow (NCAA and USHL are US leagues); everyone else keeps the CHL block ahead of them.
+// Region detection is best-effort — see ./region.
+const LEAGUE_ORDER: Record<Region, readonly string[]> = {
+  US: ["NHL", "AHL", "NCAA", "USHL", "OHL", "WHL", "QMJHL"],
+  INTL: ["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"],
+};
+
+// Section order for the Home hub, by the device's region.
+export function homeLeagueOrder(region: Region = detectRegion()): readonly string[] {
+  return LEAGUE_ORDER[region] ?? LEAGUE_ORDER.INTL;
+}
+
+// The same order applied to the picker entries, so the pills and the Home sections agree. Any league
+// missing from LEAGUE_ORDER falls to the end rather than disappearing.
+export function orderedLeagues(region: Region = detectRegion()): LeagueConfig[] {
+  const rank = new Map(homeLeagueOrder(region).map((label, i) => [label, i]));
+  return [...LEAGUES].sort(
+    (a, b) =>
+      (rank.get(a.label.toUpperCase()) ?? Number.MAX_SAFE_INTEGER) -
+      (rank.get(b.label.toUpperCase()) ?? Number.MAX_SAFE_INTEGER),
+  );
+}
 
 // Aggregate today's scores across every league into one { games, teamsById } for the Home hub.
 // Each league endpoint is independent — a failure in one doesn't sink the rest.

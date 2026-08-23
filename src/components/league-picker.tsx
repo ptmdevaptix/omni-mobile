@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { LEAGUES, leagueColors, useLeague } from '@/lib/leagues';
+import { leagueColors, orderedLeagues, useLeague } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
 // Global league selector shown above the content tabs (Scores/Standings/Stats/Teams). Reads the shared
@@ -17,7 +17,7 @@ export function LeaguePicker() {
       style={{ backgroundColor: 'transparent', flexGrow: 0 }}
       contentContainerStyle={styles.row}
     >
-      {LEAGUES.map((l) => {
+      {orderedLeagues().map((l) => {
         const active = l.id === league;
         const pill = leagueColors(l.id, dark).pill;
         return (

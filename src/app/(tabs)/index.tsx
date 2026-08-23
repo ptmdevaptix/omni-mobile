@@ -7,7 +7,7 @@ import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
-import { fetchAllScores, gameLeague, HOME_LEAGUE_ORDER } from '@/lib/leagues';
+import { fetchAllScores, gameLeague, homeLeagueOrder } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -91,7 +91,7 @@ function buildSections(games: ScoreGame[], favorites: string[]): Section[] {
   if (live.length) sections.push({ title: 'Live Scores', live: true, data: live });
 
   const remaining = games.filter((g) => !shown.has(g.id));
-  for (const lg of HOME_LEAGUE_ORDER) {
+  for (const lg of homeLeagueOrder()) {
     const grp = remaining.filter((g) => gameLeague(g) === lg);
     if (grp.length) sections.push({ title: lg, data: grp });
   }
