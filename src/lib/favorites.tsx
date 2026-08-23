@@ -11,11 +11,13 @@ const FavoritesContext = createContext<{
   favorites: string[];
   isFavorite: (id: string) => boolean;
   toggle: (id: string) => void;
+  /** Move a favorite team by index. The stored order is the order shown everywhere. */
+  moveFavorite: (from: number, to: number) => void;
   favoritePlayers: string[];
   isFavoritePlayer: (id: string) => boolean;
   togglePlayer: (id: string) => void;
 }>({
-  favorites: [], isFavorite: () => false, toggle: () => {},
+  favorites: [], isFavorite: () => false, toggle: () => {}, moveFavorite: () => {},
   favoritePlayers: [], isFavoritePlayer: () => false, togglePlayer: () => {},
 });
 
@@ -33,7 +35,15 @@ function usePersistedSet(key: string) {
     return next;
   });
   const has = (id: string) => ids.includes(id);
-  return { ids, toggle, has };
+  const move = (from: number, to: number) => setIds((prev) => {
+    if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
+    const next = [...prev];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    AsyncStorage.setItem(key, JSON.stringify(next)).catch(() => {});
+    return next;
+  });
+  return { ids, toggle, has, move };
 }
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
@@ -42,7 +52,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   return (
     <FavoritesContext.Provider
       value={{
-        favorites: teams.ids, isFavorite: teams.has, toggle: teams.toggle,
+        favorites: teams.ids, isFavorite: teams.has, toggle: teams.toggle, moveFavorite: teams.move,
         favoritePlayers: players.ids, isFavoritePlayer: players.has, togglePlayer: players.toggle,
       }}
     >
