@@ -94,7 +94,12 @@ export default function ScoresScreen() {
         />
       ) : null}
 
-      {dates ? (
+      {daysQ.isPending ? (
+        // Wait for the slate list before rendering anything. Falling through to the single-day view
+        // here flashes "No games" — that view asks the live feed, which is empty out of season — and
+        // then replaces it with the real slate a moment later.
+        <StateView kind="loading" />
+      ) : dates ? (
         <FlatList
           ref={listRef}
           horizontal
