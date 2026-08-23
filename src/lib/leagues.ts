@@ -179,11 +179,15 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 // Home hub: league grouping order for the aggregated scoreboard, keyed by game.top.
 // FUTURE: make this country-aware — default US = NHL, AHL, NCAA, OHL, WHL, QMJHL (NCAA ahead of CHL);
 // default Canada = NHL, AHL, OHL, WHL, QMJHL, NCAA (CHL ahead of NCAA). Eventually user-customizable order.
-// Region-aware league order, mirroring the web app's lib/league-order.ts. US users lead with the
-// leagues they follow (NCAA and USHL are US leagues); everyone else keeps the CHL block ahead of them.
-// Region detection is best-effort — see ./region.
+// Region-aware league order, mirroring the web app's lib/league-order.ts (whose US row also carries
+// "MC" ahead of the CHL block during the Memorial Cup — a stopgap pseudo-league that belongs in the
+// planned events model, so it's deliberately absent here).
+//
+// Only NCAA and the CHL block swap on region: US users see NCAA first, everyone else sees CHL first.
+// USHL is last in BOTH — despite being a US league, Canadian junior is followed more in the US than
+// the USHL is. Region detection is best-effort — see ./region.
 const LEAGUE_ORDER: Record<Region, readonly string[]> = {
-  US: ["NHL", "AHL", "NCAA", "USHL", "OHL", "WHL", "QMJHL"],
+  US: ["NHL", "AHL", "NCAA", "OHL", "WHL", "QMJHL", "USHL"],
   INTL: ["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"],
 };
 
