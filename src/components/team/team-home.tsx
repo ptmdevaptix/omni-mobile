@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NewsCard } from '@/components/news-card';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
-import { shortDate, timeOfDay } from '@/lib/format';
+import { seasonOf, shortDate, timeOfDay } from '@/lib/format';
 import { fetchTeamNews } from '@/lib/news';
 import { fetchTeamHome } from '@/lib/team';
 import type { DivTeam, Leader, MiniGame, TeamHomeData } from '@/lib/team-types';
@@ -29,7 +29,17 @@ export function TeamHome({ teamId }: { teamId: string }) {
 
       {games.length ? (
         <Card title="Recent & Upcoming">
-          {games.map((g, i) => <MiniGameRow key={`${g.id}-${i}`} g={g} />)}
+          {games.map((g, i) => {
+            // Between the end of one season and the start of the next, this list jumps months without
+            // saying so. A rule is enough to signal the break — no label needed.
+            const newSeason = i > 0 && seasonOf(games[i - 1].date) !== seasonOf(g.date);
+            return (
+              <View key={`${g.id}-${i}`}>
+                {newSeason ? <SeasonDivider /> : null}
+                <MiniGameRow g={g} />
+              </View>
+            );
+          })}
         </Card>
       ) : null}
 
@@ -76,6 +86,13 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       {children}
     </View>
   );
+}
+
+// Season break. Tinted with the accent and inset from the edges so it reads as a division between
+// groups rather than as another row separator.
+function SeasonDivider() {
+  const t = useTheme();
+  return <View style={[styles.seasonDivider, { backgroundColor: t.accent }]} />;
 }
 
 function MiniGameRow({ g }: { g: MiniGame }) {
@@ -138,6 +155,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, gap: 2 },
   cardTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
   mg: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+  seasonDivider: { height: 1, borderRadius: 1, marginVertical: 7, marginHorizontal: 2, opacity: 0.45 },
   ldr: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
   stRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 4 },
   div: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },

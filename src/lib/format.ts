@@ -57,6 +57,16 @@ export function cardDate(iso?: string, fallbackDay?: string, today: string = day
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+// Which hockey season a date belongs to, as the starting year: seasons run roughly Aug → Jun, so
+// Apr 2026 is still the 2025 season while Sep 2026 begins the 2026 one. Used to spot the boundary
+// between two seasons in a list of games without needing the feeds to label it.
+export function seasonOf(date?: string): number | null {
+  if (!date) return null;
+  const [y, m] = date.split('-').map(Number);
+  if (!y || !m) return null;
+  return m >= 8 ? y : y - 1;
+}
+
 // seconds → "M:SS" (time on ice)
 export function mmss(sec?: number): string {
   if (!sec || sec <= 0) return '—';
