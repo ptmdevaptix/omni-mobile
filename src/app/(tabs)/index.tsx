@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { GameCard } from '@/components/game-card';
+import { KeyDateBanner } from '@/components/key-date-banner';
 import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
@@ -53,6 +54,9 @@ export default function HomeScreen() {
           maxToRenderPerBatch={10}
           windowSize={11}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
+          // Inside the list, not pinned above it: there's no dismiss here like on web, and it would
+          // otherwise hold a strip of every Home visit for the weeks it's up.
+          ListHeaderComponent={<KeyDateBanner />}
           ListEmptyComponent={<StateView kind="offseason" title="No games today" message="Scores will appear here when games are on." />}
           renderSectionHeader={({ section }) => <SectionHeader title={section.title} live={section.live} />}
           renderItem={({ item, section }) => (
