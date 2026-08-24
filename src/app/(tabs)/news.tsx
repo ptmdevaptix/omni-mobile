@@ -76,10 +76,10 @@ function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshi
       const fromTag = items.flatMap((a) => a.teamTags ?? []).find((tag) => tag.id === id);
       return { id, name: tm?.name ?? fromTag?.name ?? id, logo: tm?.logo ?? fromTag?.logo, darkLogo: tm?.darkLogo ?? fromTag?.darkLogo, league: leagueOfId(id), data: tagged };
     });
-    // The user's favorite order, as-is. It used to re-sort by has-news, then league, then name, which
-    // discarded the ordering set in Settings — someone who put their team first still found it fourth.
-    // Teams with nothing today keep their place and show "No recent news."
-    return built;
+    // Favorite order within two groups: teams with news first, then teams without. Partitioned rather
+    // than sorted so the ordering set in Settings is preserved exactly inside each group — the old
+    // comparator also ranked by league and name, which discarded it entirely.
+    return [...built.filter((s) => s.data.length), ...built.filter((s) => !s.data.length)];
   }, [favorites, teamsQ.data, items]);
 
   if (!favorites.length) {
