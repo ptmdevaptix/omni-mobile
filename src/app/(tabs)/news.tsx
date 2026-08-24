@@ -53,7 +53,6 @@ function Latest({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshin
 }
 
 // "My Teams" league grouping order; USHL/other fall to the end.
-const NEWS_LEAGUE_ORDER = ['NHL', 'AHL', 'NCAA', 'OHL', 'WHL', 'QMJHL'];
 function leagueOfId(id: string): string {
   if (id.startsWith('ahl-')) return 'AHL';
   if (id.startsWith('chl-ohl-')) return 'OHL';
@@ -63,7 +62,6 @@ function leagueOfId(id: string): string {
   if (id.startsWith('ushl-')) return 'USHL';
   return 'NHL';
 }
-const leagueRank = (lg: string) => { const i = NEWS_LEAGUE_ORDER.indexOf(lg); return i === -1 ? 99 : i; };
 
 function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshing: boolean; onRefresh: () => void }) {
   const t = useTheme();
@@ -78,12 +76,10 @@ function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshi
       const fromTag = items.flatMap((a) => a.teamTags ?? []).find((tag) => tag.id === id);
       return { id, name: tm?.name ?? fromTag?.name ?? id, logo: tm?.logo ?? fromTag?.logo, darkLogo: tm?.darkLogo ?? fromTag?.darkLogo, league: leagueOfId(id), data: tagged };
     });
-    // Teams with news first, then by league (NHL→AHL→NCAA→OHL→WHL→QMJHL), then alphabetical by name.
-    return built.sort((a, b) =>
-      (a.data.length ? 0 : 1) - (b.data.length ? 0 : 1)
-      || leagueRank(a.league) - leagueRank(b.league)
-      || a.name.localeCompare(b.name),
-    );
+    // The user's favorite order, as-is. It used to re-sort by has-news, then league, then name, which
+    // discarded the ordering set in Settings — someone who put their team first still found it fourth.
+    // Teams with nothing today keep their place and show "No recent news."
+    return built;
   }, [favorites, teamsQ.data, items]);
 
   if (!favorites.length) {
