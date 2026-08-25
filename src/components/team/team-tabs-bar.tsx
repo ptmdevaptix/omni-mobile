@@ -25,6 +25,8 @@ export function TeamTabsBar({ tabs, value, onChange }: { tabs: TeamTab[]; value:
 }
 
 const styles = StyleSheet.create({
-  row: { paddingHorizontal: 12, paddingBottom: 10, gap: 8 },
+  // Symmetric vertical padding: without the top value the pills sat flush against the team header's
+  // bottom border, which read as them being clipped by it.
+  row: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, gap: 8 },
   pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
 });
