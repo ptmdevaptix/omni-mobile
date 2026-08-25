@@ -51,7 +51,10 @@ export function TeamHome({ teamId }: { teamId: string }) {
         </Card>
       ) : null}
 
-      {d.ppPct != null ? (
+      {/* `> 0`, not `!= null` — the AHL/CHL/USHL endpoints hardcode 0 for special teams because
+          HockeyTech doesn't supply them, and 0 is not null. Rendering it claimed a 0.0% power play
+          and a rank of #0/0. This matches the web's guard in components/team-home.tsx. */}
+      {d.ppPct > 0 || d.pkPct > 0 ? (
         <Card title="Special Teams">
           <View style={styles.stRow}>
             <Stat label="PP%" val={`${d.ppPct?.toFixed(1)}%`} rank={d.ppRank} total={d.totalTeams} />

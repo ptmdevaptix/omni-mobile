@@ -3,11 +3,16 @@ import type { RosterResponse, ScheduleGame, TeamHomeData, TeamOrganization, Team
 
 export type TeamTab = 'home' | 'schedule' | 'roster' | 'stats' | 'prospects' | 'news';
 
-// Which sub-tabs a team shows, mirroring the web's teamTabs(): USHL is roster/stats only; NHL adds
-// Prospects; everyone else gets home/schedule/roster/stats. All non-USHL teams get a News tab.
+// Which sub-tabs a team shows. NHL adds Prospects; everyone else gets home/schedule/roster/stats.
+//
+// USHL gets everything except News. It was roster/stats only until 2026-08-25, on the belief that this
+// mirrored the web — it didn't; the web has always shown USHL the full set, and /ushl-team/{id}/home
+// and /schedule both return real data (62 games for Chicago Steel). News stays off because the scanner
+// has found 9 USHL articles in total, so the tab would be empty for nearly every team. Revisit if
+// USHL coverage picks up.
 export function teamTabs(teamId: string): TeamTab[] {
   const league = leagueOf(teamId);
-  if (league === 'USHL') return ['roster', 'stats'];
+  if (league === 'USHL') return ['home', 'schedule', 'roster', 'stats'];
   if (league === 'NHL') return ['home', 'schedule', 'roster', 'stats', 'prospects', 'news'];
   return ['home', 'schedule', 'roster', 'stats', 'news'];
 }

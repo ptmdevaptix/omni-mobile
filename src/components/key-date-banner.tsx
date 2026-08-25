@@ -31,7 +31,15 @@ export function KeyDateBanner() {
   return (
     <View style={[styles.wrap, { backgroundColor: t.card, borderColor: t.border }]}>
       <Image source={{ uri: LOGO }} style={styles.logo} contentFit="contain" transition={0} />
-      <Text style={{ color: t.text, fontSize: 13, fontWeight: '600', flexShrink: 1 }} numberOfLines={2}>
+      {/* One line, always. Later phases of the calendar produce longer lines than the current one
+          ("preseason underway — regular season begins Oct 2"), so rather than tune the copy to a
+          width it can't be held to, the text shrinks a little when it has to. Never truncates. */}
+      <Text
+        style={{ color: t.text, fontSize: 13, fontWeight: '600', flexShrink: 1 }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.82}
+      >
         {headline}
       </Text>
     </View>
