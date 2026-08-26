@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, View } from 'react-native';
 
 import { useCompact } from '@/lib/compact';
+import { useLayout } from '@/lib/layout';
 import { useTheme, useThemeMode } from '@/lib/theme';
 
 // Right-side nav-bar actions (all tabs): open team/player search, toggle compact scores, and toggle light/dark.
@@ -11,11 +12,15 @@ export function HeaderActions() {
   const router = useRouter();
   const { scheme, setPref } = useThemeMode();
   const { compact, setCompact } = useCompact();
+  // On iPad search lives in the side rail, so it isn't offered twice.
+  const { regular } = useLayout();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, paddingRight: 4 }}>
-      <Pressable onPress={() => router.push('/search')} hitSlop={10} accessibilityLabel="Search">
-        <SymbolView name="magnifyingglass" tintColor={t.text} size={20} />
-      </Pressable>
+      {regular ? null : (
+        <Pressable onPress={() => router.push('/search')} hitSlop={10} accessibilityLabel="Search">
+          <SymbolView name="magnifyingglass" tintColor={t.text} size={20} />
+        </Pressable>
+      )}
       <Pressable
         onPress={() => setCompact(!compact)}
         hitSlop={10}

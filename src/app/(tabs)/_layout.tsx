@@ -5,6 +5,7 @@ import type { ColorValue } from 'react-native';
 
 import { HeaderActions } from '@/components/header-actions';
 import { OmniHeader } from '@/components/omni-header';
+import { useLayout } from '@/lib/layout';
 import { LeagueContext, leagueColors, type LeagueId } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
@@ -14,15 +15,23 @@ function TabIcon({ name, color, size }: { name: SymbolViewProps['name']; color: 
 
 export default function TabsLayout() {
   const t = useTheme();
+  const layout = useLayout();
   // Shared league selection across the content tabs (Scores/Standings/Stats/Teams).
   const [league, setLeague] = useState<LeagueId>('nhl');
   // Scores + Standings tint their chrome (header + tab bar) to the selected league; other tabs stay neutral.
   const chromeBg = leagueColors(league, t.mode === 'dark').bg;
-  const leagueChrome = { headerStyle: { backgroundColor: chromeBg }, headerShadowVisible: false, tabBarStyle: { backgroundColor: chromeBg } };
+  const leagueChrome = {
+    headerStyle: { backgroundColor: chromeBg },
+    headerShadowVisible: false,
+    tabBarStyle: { backgroundColor: chromeBg },
+  };
 
   return (
     <LeagueContext.Provider value={{ league, setLeague }}>
       <Tabs
+        // On iPad the root rail is the navigation, so the tab bar renders nothing — these screens
+        // are just the four destinations it points at. The phone keeps the bottom bar.
+        {...(layout.regular ? { tabBar: () => null } : {})}
         screenOptions={{
           tabBarActiveTintColor: t.accent,
           tabBarInactiveTintColor: t.sub,

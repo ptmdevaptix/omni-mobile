@@ -3,14 +3,17 @@ import { Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, View, type AppStateStatus } from 'react-native';
 
+import { SideRail } from '@/components/side-rail';
 import { CompactModeProvider } from '@/lib/compact';
 import { FavoritesProvider } from '@/lib/favorites';
+import { useLayout } from '@/lib/layout';
 import { NotificationPrefsProvider } from '@/lib/notification-prefs';
 import { useNotificationTaps, usePushSync } from '@/lib/push';
 import { queryClient } from '@/lib/query';
-import { ThemeModeProvider, navTheme, useThemeMode } from '@/lib/theme';
+import { SidebarProvider } from '@/lib/sidebar';
+import { ThemeModeProvider, navTheme, palette, useThemeMode } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -22,6 +25,7 @@ function onAppStateChange(status: AppStateStatus) {
 
 function RootNav() {
   const { scheme } = useThemeMode();
+  const { regular } = useLayout();
   // Mounted here, not in Settings: favorites also change from the ★ on team pages, and the server's
   // copy has to follow.
   usePushSync();
@@ -29,6 +33,11 @@ function RootNav() {
   return (
     <ThemeProvider value={navTheme(scheme)}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      {/* The rail sits beside the whole Stack, not inside a navigator, so it survives every push —
+          open a team, a game or Settings and the sidebar stays put, as it should on iPad. */}
+      <View style={{ flex: 1, flexDirection: 'row', backgroundColor: palette(scheme).bg }}>
+        {regular ? <SideRail /> : null}
+        <View style={{ flex: 1 }}>
       <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="teams/index" options={{ title: 'Teams' }} />
@@ -42,6 +51,8 @@ function RootNav() {
         <Stack.Screen name="info/[slug]" options={{ title: 'Info' }} />
         <Stack.Screen name="search" options={{ title: 'Search', presentation: 'modal' }} />
       </Stack>
+        </View>
+      </View>
     </ThemeProvider>
   );
 }
@@ -57,11 +68,13 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider>
         <CompactModeProvider>
-          <FavoritesProvider>
-            <NotificationPrefsProvider>
-              <RootNav />
-            </NotificationPrefsProvider>
-          </FavoritesProvider>
+          <SidebarProvider>
+            <FavoritesProvider>
+              <NotificationPrefsProvider>
+                <RootNav />
+              </NotificationPrefsProvider>
+            </FavoritesProvider>
+          </SidebarProvider>
         </CompactModeProvider>
       </ThemeModeProvider>
     </QueryClientProvider>
