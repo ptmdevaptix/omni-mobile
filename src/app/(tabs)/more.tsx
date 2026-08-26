@@ -20,7 +20,10 @@ export default function MoreScreen() {
   const t = useTheme();
   const router = useRouter();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      contentContainerStyle={{ width: '100%', maxWidth: 640, alignSelf: 'center', padding: 16 }}
+    >
       <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
         {ROWS.map((row, i) => (
           <Pressable

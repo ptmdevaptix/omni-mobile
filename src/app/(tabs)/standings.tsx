@@ -9,6 +9,7 @@ import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { WlotlStandings } from '@/components/wlotl-standings';
+import { useLayout } from '@/lib/layout';
 import {
   fetchNcaaStandings, leagueById, leagueColors, useLeague,
   type NcaaStandingsTeam,
@@ -37,6 +38,7 @@ const ncaaWinPct = (x: NcaaStandingsTeam) => { const g = x.oW + x.oL + x.oT; ret
 function NcaaStandings({ card }: { card: string }) {
   const t = useTheme();
   const [view, setView] = useState<NcaaView>('conference');
+  const layout = useLayout();
   const pill = leagueColors('ncaa', t.mode === 'dark').pill;
   const q = useQuery({ queryKey: ['ncaa-standings'], queryFn: fetchNcaaStandings });
   const { refreshing, onRefresh } = usePullRefresh(q.refetch);
@@ -53,8 +55,14 @@ function NcaaStandings({ card }: { card: string }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <SegmentedFilter options={['conference', 'league']} value={view} onChange={(v) => setView(v as NcaaView)} pill={pill} />
-      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}>
+      <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}>
+        <SegmentedFilter options={['conference', 'league']} value={view} onChange={(v) => setView(v as NcaaView)} pill={pill} />
+      </View>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ width: '100%', maxWidth: layout.readWidth, alignSelf: 'center' }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
+      >
         {sections.map((sec, si) => (
           <View key={si}>
             <View style={[styles.row, { backgroundColor: superTint, borderColor: t.border }]}>

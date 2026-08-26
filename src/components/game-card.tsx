@@ -22,12 +22,29 @@ const GOLD = ['#f8e6a8', '#c9a227', '#7d6316', '#e9cd72'] as const;   // dark mo
 const PEWTER = ['#f0f2f4', '#a7abb0', '#5f6368', '#c8ccd0'] as const; // light mode
 
 type Result = 'win' | 'loss' | 'tie' | undefined;
-type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string; compact?: boolean };
+type GameCardProps = {
+  game: ScoreGame;
+  teams: Record<string, ScoreTeam>;
+  featured?: boolean;
+  cardColor?: string;
+  compact?: boolean;
+  fill?: boolean;
+  /**
+   * Overrides the default push-to-game-detail — the iPad split view selects into its pane instead.
+   * Takes the game so callers can pass one stable handler (a per-card closure would defeat memo()).
+   */
+  onOpen?: (game: ScoreGame) => void;
+  /** Marks the card as the one showing in the split view's detail pane. */
+  selected?: boolean;
+};
 
 // Shared score card. Tapping the card opens the game; tapping a team's logo/name opens that team.
 // `featured` wraps it in a metallic border (favorited teams in the Home "My Teams" section).
 // `compact` renders a tighter, abbreviation-based card so two fit side by side (grid mode).
-function GameCardBase({ game, teams, featured = false, cardColor, compact = false }: GameCardProps) {
+// `fill` means the card sits in a multi-column row and should share the row width evenly — on iPad
+// that happens at full card size, so it's independent of `compact`.
+function GameCardBase({ game, teams, featured = false, cardColor, compact = false, fill, onOpen, selected = false }: GameCardProps) {
+  const flex = fill ?? compact;
   const t = useTheme();
   const router = useRouter();
   const away = teams[game.awayTeamId] ?? {};
@@ -43,7 +60,10 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const awayResult: Result = !final ? undefined : aw === hm ? 'tie' : aw > hm ? 'win' : 'loss';
   const homeResult: Result = !final ? undefined : hm === aw ? 'tie' : hm > aw ? 'win' : 'loss';
 
-  const openGame = () => router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
+  const openGame = () => {
+    if (onOpen) return onOpen(game);
+    router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
+  };
   // Navigate with the canonical id so the team page, its endpoint and the ★ all agree — the CHL
   // scoreboard's own ids ("qmjhl-2") are not valid /teams ids.
   const openTeam = (id: string) => router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(id) } });
@@ -79,7 +99,7 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
 
   if (featured) {
     return (
-      <Pressable onPress={openGame} style={[styles.metalShadow, compact && styles.flex1]}>
+      <Pressable onPress={openGame} style={[styles.metalShadow, flex && styles.flex1]}>
         <LinearGradient colors={t.mode === 'dark' ? GOLD : PEWTER} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.metalFrame}>
           <View style={[styles.card, styles.cardInner, compact && styles.cardCompact, { backgroundColor: t.card }]}>{content}</View>
         </LinearGradient>
@@ -88,7 +108,19 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   }
 
   return (
-    <Pressable onPress={openGame} style={[styles.card, compact && styles.cardCompact, compact && styles.flex1, { backgroundColor: cardColor ?? t.card, borderColor: t.border }]}>{content}</Pressable>
+    <Pressable
+      onPress={openGame}
+      style={[
+        styles.card,
+        compact && styles.cardCompact,
+        flex && styles.flex1,
+        { backgroundColor: cardColor ?? t.card, borderColor: t.border },
+        // Selection reads the iOS way — a tinted row — rather than a heavy web-style outline.
+        selected && { backgroundColor: t.accentSoft, borderColor: t.accent },
+      ]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -129,7 +161,8 @@ const teamEq = (x?: ScoreTeam, y?: ScoreTeam) =>
 
 function areEqual(a: GameCardProps, b: GameCardProps): boolean {
   const g1 = a.game, g2 = b.game;
-  if (a.featured !== b.featured || a.cardColor !== b.cardColor || a.compact !== b.compact) return false;
+  if (a.featured !== b.featured || a.cardColor !== b.cardColor || a.compact !== b.compact || a.fill !== b.fill
+    || a.selected !== b.selected || a.onOpen !== b.onOpen) return false;
   if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel
     || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network) return false;
   return teamEq(a.teams[g1.awayTeamId], b.teams[g2.awayTeamId]) && teamEq(a.teams[g1.homeTeamId], b.teams[g2.homeTeamId]);

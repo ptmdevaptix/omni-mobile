@@ -8,32 +8,29 @@ import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
+import { centered, gameColumns, toRows, useLayout } from '@/lib/layout';
 import { fetchAllScores, gameLeague, homeLeagueOrder } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
 
 type Section = { title: string; live?: boolean; data: ScoreGame[] };
-// Each rendered item is a "row" of 1 game (full) or up to 2 games (compact grid).
+// Each rendered item is a "row" of games — 1 on a phone, up to 4 on an iPad in compact mode.
 type RowSection = { title: string; live?: boolean; data: ScoreGame[][] };
-
-function toRows(games: ScoreGame[], per: number): ScoreGame[][] {
-  const rows: ScoreGame[][] = [];
-  for (let i = 0; i < games.length; i += per) rows.push(games.slice(i, i + per));
-  return rows;
-}
 
 // Home: cross-league scoreboard. My Teams → Live Scores → remaining grouped by league (NHL first).
 export default function HomeScreen() {
   const t = useTheme();
   const { favorites } = useFavorites();
   const { compact } = useCompact();
+  const layout = useLayout();
+  const per = gameColumns(layout, compact);
   const q = useQuery({ queryKey: ['all-scores'], queryFn: fetchAllScores, refetchInterval: 30_000 });
 
   const { refreshing, onRefresh } = usePullRefresh(q.refetch);
   const teams = q.data?.teamsById ?? {};
   const sections = useMemo(() => buildSections(q.data?.games ?? [], favorites), [q.data, favorites]);
-  const rowSections = useMemo<RowSection[]>(() => sections.map((s) => ({ ...s, data: toRows(s.data, compact ? 2 : 1) })), [sections, compact]);
+  const rowSections = useMemo<RowSection[]>(() => sections.map((s) => ({ ...s, data: toRows(s.data, per) })), [sections, per]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -44,9 +41,9 @@ export default function HomeScreen() {
         <StateView kind="error" message="Couldn’t load scores." onRetry={() => q.refetch()} />
       ) : (
         <SectionList
-          key={compact ? 'grid' : 'list'}
+          key={`${per}`}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
+          contentContainerStyle={{ ...centered(layout), paddingBottom: 24 }}
           sections={rowSections}
           keyExtractor={(row) => row[0].id}
           stickySectionHeadersEnabled={false}
@@ -60,9 +57,14 @@ export default function HomeScreen() {
           ListEmptyComponent={<StateView kind="offseason" title="No games today" message="Scores will appear here when games are on." />}
           renderSectionHeader={({ section }) => <SectionHeader title={section.title} live={section.live} />}
           renderItem={({ item, section }) => (
-            <View style={compact ? { flexDirection: 'row', gap: 10 } : undefined}>
-              {item.map((g) => <GameCard key={g.id} game={g} teams={teams} featured={section.title === 'My Teams'} compact={compact} />)}
-              {compact && item.length === 1 ? <View style={{ flex: 1 }} /> : null}
+            <View style={per > 1 ? { flexDirection: 'row', gap: 10 } : undefined}>
+              {item.map((g) => (
+                <GameCard key={g.id} game={g} teams={teams} featured={section.title === 'My Teams'} compact={compact} fill={per > 1} />
+              ))}
+              {/* Keep a short last row's cards at column width instead of stretching them. */}
+              {per > 1 && item.length < per
+                ? Array.from({ length: per - item.length }, (_, i) => <View key={`pad${i}`} style={{ flex: 1 }} />)
+                : null}
             </View>
           )}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}

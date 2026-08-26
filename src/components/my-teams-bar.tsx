@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
+import { useLayout } from '@/lib/layout';
 import { fetchAllTeams } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
@@ -11,13 +12,19 @@ import { useTheme } from '@/lib/theme';
 export function MyTeamsBar() {
   const t = useTheme();
   const { favorites } = useFavorites();
+  const layout = useLayout();
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
   if (!favorites.length) return null;
   const byId = new Map((q.data ?? []).map((tm) => [tm.id, tm]));
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.row}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ flexGrow: 0, width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' }}
+      contentContainerStyle={[styles.row, { paddingHorizontal: layout.gutter }]}
+    >
       {favorites.map((id) => {
         const tm = byId.get(id);
         return (

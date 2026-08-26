@@ -15,6 +15,7 @@ import { TeamTabsBar } from '@/components/team/team-tabs-bar';
 import { TeamLogo } from '@/components/team-logo';
 import { api, leagueOf, teamHeaderPath } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
+import { useLayout } from '@/lib/layout';
 import { teamTabs, type TeamTab } from '@/lib/team';
 import { useTheme } from '@/lib/theme';
 import type { TeamHeader } from '@/lib/types';
@@ -23,6 +24,7 @@ export default function TeamScreen() {
   const t = useTheme();
   const { isFavorite, toggle } = useFavorites();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
+  const layout = useLayout();
 
   const tabs = teamTabs(teamId);
   const [tab, setTab] = useState<TeamTab>(tabs[0]);
@@ -39,7 +41,7 @@ export default function TeamScreen() {
       ) : !team ? (
         <StateView kind="loading" />
       ) : (
-        <>
+        <View style={{ flex: 1, width: '100%', maxWidth: layout.readWidth, alignSelf: 'center' }}>
           <View style={[styles.hero, { borderColor: t.border }]}>
             {team.logo ? <TeamLogo uri={team.logo} size={52} /> : null}
             <View style={{ flex: 1 }}>
@@ -65,7 +67,7 @@ export default function TeamScreen() {
               : tab === 'news' ? <TeamNews teamId={teamId} />
               : <TeamProspects teamId={teamId} />}
           </View>
-        </>
+        </View>
       )}
     </View>
   );

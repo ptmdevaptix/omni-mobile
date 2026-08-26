@@ -11,12 +11,15 @@ export type Theme = {
   mode: 'light' | 'dark';
   bg: string; card: string; text: string; sub: string; subtle: string;
   border: string; accent: string; onAccent: string; live: string;
+  /** Accent at low opacity — iOS-style selection fill (selected sidebar row, selected list card). */
+  accentSoft: string;
 };
 
 const light: Theme = {
   mode: 'light',
   bg: '#f2f2f7', card: '#ffffff', text: '#000000', sub: '#6c6c70', subtle: '#a1a1a6',
   border: '#d1d1d6', accent: '#208aef', onAccent: '#ffffff', live: '#34c759', // green = in-progress (not an alert)
+  accentSoft: 'rgba(32,138,239,0.14)',
 };
 const dark: Theme = {
   mode: 'dark',
@@ -24,6 +27,7 @@ const dark: Theme = {
   // Dark mode uses gold for active/selected (harmonizes with the metallic "My Teams" frame); onAccent is
   // dark so text on gold pills stays readable. Light mode keeps blue (below) for now.
   border: '#2c2c2e', accent: '#e8bb46', onAccent: '#1a1400', live: '#30d158', // green = in-progress (not an alert)
+  accentSoft: 'rgba(232,187,70,0.18)',
 };
 
 export function palette(scheme: Scheme): Theme {

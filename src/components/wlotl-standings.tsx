@@ -6,6 +6,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { placeName } from '@/lib/format';
+import { useLayout } from '@/lib/layout';
 import { fetchStandings, leagueColors, type LeagueId } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
@@ -60,6 +61,7 @@ export function WlotlStandings({ league, card }: { league: string; card: string 
   const viewOptions: ViewType[] = isQmjhl ? ['conference', 'league'] : ['division', 'conference', 'league'];
   const pill = leagueColors(league as LeagueId, t.mode === 'dark').pill;
   const [view, setView] = useState<ViewType>(isQmjhl ? 'conference' : 'division');
+  const layout = useLayout();
   const q = useQuery({ queryKey: ['standings', league], queryFn: () => fetchStandings(league as LeagueId) });
   const { refreshing, onRefresh } = usePullRefresh(q.refetch);
   const sections = useMemo(() => buildSections(q.data ?? [], view), [q.data, view]);
@@ -71,8 +73,11 @@ export function WlotlStandings({ league, card }: { league: string; card: string 
   const superTint = t.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.045)';
   return (
     <View style={{ flex: 1 }}>
-      <ViewFilter value={view} onChange={setView} options={viewOptions} pill={pill} />
-      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}>
+      <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}>
+        <ViewFilter value={view} onChange={setView} options={viewOptions} pill={pill} />
+      </View>
+      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
+        contentContainerStyle={{ width: '100%', maxWidth: layout.readWidth, alignSelf: 'center' }}>
         {sections.map((sec, si) => (
           <View key={si}>
             {sec.confHeader ? (

@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
+import { useLayout } from '@/lib/layout';
 import { leagueColors, orderedLeagues, useLeague } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
@@ -10,12 +11,19 @@ export function LeaguePicker() {
   const t = useTheme();
   const dark = t.mode === 'dark';
   const { league, setLeague } = useLeague();
+  const layout = useLayout();
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={{ backgroundColor: 'transparent', flexGrow: 0 }}
-      contentContainerStyle={styles.row}
+      // Centered on iPad: the content below (a centered grid, or a table capped to its columns)
+      // sits on the screen's center line, and a left-hugging pill row would float away from it.
+      style={{ backgroundColor: 'transparent', flexGrow: 0, width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' }}
+      contentContainerStyle={[
+        styles.row,
+        { paddingHorizontal: layout.gutter },
+        layout.regular && { flexGrow: 1, justifyContent: 'center' },
+      ]}
     >
       {orderedLeagues().map((l) => {
         const active = l.id === league;

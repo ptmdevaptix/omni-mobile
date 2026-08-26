@@ -9,6 +9,7 @@ import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
+import { centered, toRows, useLayout } from '@/lib/layout';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { fetchNews, timeAgo, type NewsItem } from '@/lib/news';
 import { usePullRefresh } from '@/lib/pull-refresh';
@@ -22,7 +23,7 @@ export default function NewsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={styles.filter}>
+      <View style={[styles.filter, { width: '100%', maxWidth: 520, alignSelf: 'center' }]}>
         <SegmentedFilter options={['My Teams', 'Latest']} value={view} onChange={setView} pill={t.accent} />
       </View>
       {q.isLoading ? (
@@ -40,14 +41,26 @@ export default function NewsScreen() {
 
 function Latest({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshing: boolean; onRefresh: () => void }) {
   const t = useTheme();
+  const layout = useLayout();
+  // Article cards carry a 160pt image, so they read better two-up than stretched across an iPad.
+  const per = layout.regular ? 2 : 1;
+  const rows = useMemo(() => toRows(items, per), [items, per]);
   return (
     <FlatList
-      contentContainerStyle={{ padding: 12, gap: 10 }}
-      data={items}
-      keyExtractor={(a) => String(a.id)}
+      key={`${per}`}
+      contentContainerStyle={{ ...centered(layout), paddingVertical: 12, gap: 10 }}
+      data={rows}
+      keyExtractor={(row) => String(row[0].id)}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
       ListEmptyComponent={<StateView kind="empty" title="No news" message="Nothing to show right now." />}
-      renderItem={({ item }) => <NewsCard a={item} />}
+      renderItem={({ item }) => (
+        <View style={per > 1 ? { flexDirection: 'row', gap: 10, alignItems: 'flex-start' } : undefined}>
+          {item.map((a) => (
+            <View key={String(a.id)} style={per > 1 ? { flex: 1 } : undefined}><NewsCard a={a} /></View>
+          ))}
+          {per > 1 && item.length < per ? <View style={{ flex: 1 }} /> : null}
+        </View>
+      )}
     />
   );
 }
@@ -66,6 +79,7 @@ function leagueOfId(id: string): string {
 function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshing: boolean; onRefresh: () => void }) {
   const t = useTheme();
   const { favorites } = useFavorites();
+  const layout = useLayout();
   const teamsQ = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
   const sections = useMemo(() => {
@@ -88,7 +102,7 @@ function MyTeams({ items, refreshing, onRefresh }: { items: NewsItem[]; refreshi
 
   return (
     <SectionList
-      contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
+      contentContainerStyle={{ ...centered(layout, { padding: layout.regular ? layout.gutter : 12 }), paddingBottom: 24 }}
       sections={sections}
       keyExtractor={(a) => String(a.id)}
       stickySectionHeadersEnabled={false}

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
+import { useLayout } from '@/lib/layout';
 import { fetchNhlStandings, leagueColors, type NhlStandingsTeam } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { nhlNickname } from '@/lib/nhl-teams';
@@ -104,11 +105,19 @@ function buildSections(teams: NhlStandingsTeam[], view: ViewType, col: string, a
 export function NhlStandings({ card }: { card?: string }) {
   const t = useTheme();
   const pill = leagueColors('nhl', t.mode === 'dark').pill;
-  const { width, height } = useWindowDimensions();
+  const { width: windowWidth, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const portrait = height >= width;
-  const safeWidth = width - insets.left - insets.right; // keep columns clear of the Dynamic Island
-  const teamMin = portrait ? 72 : 132; // portrait shows 3-letter abbrs (compact); landscape shows names
+  const layout = useLayout();
+  const portrait = height >= windowWidth;
+  // layout.width, not the window: on iPad the rail owns a couple hundred points, and budgeting
+  // columns against the full window pushes the last ones off behind it.
+  const safeWidth = layout.width - insets.left - insets.right; // also keeps clear of the Dynamic Island
+  // The table caps at the content column, so column budgeting works off that, not the whole screen.
+  const tableWidth = Math.min(safeWidth, layout.maxWidth);
+  // "Roomy" is about width, not orientation: an iPad in portrait has more room than a phone in
+  // landscape and should get the full stat set, not the 3-letter compact table.
+  const roomy = tableWidth >= 700;
+  const teamMin = roomy ? 180 : portrait ? 72 : 132;
   const [view, setView] = useState<ViewType>('division');
   const [sortCol, setSortCol] = useState('pts');
   const [sortAsc, setSortAsc] = useState(false);
@@ -119,17 +128,25 @@ export function NhlStandings({ card }: { card?: string }) {
   // Columns that fit without horizontal scroll. Portrait = fixed compact set ending at GA; landscape =
   // greedy fill by priority within the SAFE width (so the last column isn't hidden under the notch).
   const visible = useMemo(() => {
-    if (portrait) return COLS.filter((c) => PORTRAIT_KEYS.has(c.key));
-    const budget = safeWidth - 24 - teamMin - FORCED_W;
+    if (portrait && !roomy) return COLS.filter((c) => PORTRAIT_KEYS.has(c.key));
+    const budget = tableWidth - 24 - teamMin - FORCED_W;
     let used = 0;
     const keep = new Set(FORCED);
     for (const col of [...COLS].filter((c) => !FORCED.has(c.key)).sort((a, b) => a.priority - b.priority)) {
       if (used + col.w <= budget) { keep.add(col.key); used += col.w; }
     }
     return COLS.filter((c) => keep.has(c.key));
-  }, [portrait, safeWidth, teamMin]);
+  }, [portrait, roomy, tableWidth, teamMin]);
 
   const sections = useMemo(() => (q.data ? buildSections(q.data, view, sortCol, sortAsc) : []), [q.data, view, sortCol, sortAsc]);
+
+  // Cap the table at the width its columns actually need. Left to stretch, the team cell (flex: 1)
+  // swallows the slack and opens a canyon between the team name and GP — which is what makes a wide
+  // table read as a web page rather than the phone's tidy list.
+  // Only on a wide window: on a phone the table is already narrower than the screen, and capping it
+  // there would inset it from the edges the phone layout deliberately runs to.
+  const naturalWidth = 24 + teamMin + visible.reduce((sum, c) => sum + c.w, 0);
+  const tableCap = layout.regular ? Math.min(tableWidth, naturalWidth) : tableWidth;
 
   function onSort(key: string) {
     const def = COLS.find((c) => c.key === key);
@@ -143,21 +160,26 @@ export function NhlStandings({ card }: { card?: string }) {
 
   return (
     <View style={{ flex: 1, paddingLeft: insets.left, paddingRight: insets.right }}>
-      <ViewFilter value={view} onChange={setView} pill={pill} />
+      {/* A segmented control doesn't want to be 1280pt wide. */}
+      <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}>
+        <ViewFilter value={view} onChange={setView} pill={pill} />
+      </View>
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
       >
-        {sections.map((sec, si) => (
-          <View key={si}>
-            {sec.confHeader ? <ConfSuperHeader label={sec.confHeader} /> : null}
-            <HeaderRow label={sec.label} cols={visible} teamMin={teamMin} confKey={sec.confKey} sortCol={sortCol} sortAsc={sortAsc} onSort={onSort} />
-            {sec.teams.map((team) => <TeamRow key={team.abbr} team={team} cols={visible} teamMin={teamMin} sortCol={sortCol} card={card} />)}
-          </View>
-        ))}
-        <Text style={{ color: t.subtle, fontSize: 11, padding: 12 }}>
-          Tap a column to sort; rotate for more stats.
-        </Text>
+        <View style={{ width: '100%', maxWidth: tableCap, alignSelf: 'center' }}>
+          {sections.map((sec, si) => (
+            <View key={si}>
+              {sec.confHeader ? <ConfSuperHeader label={sec.confHeader} /> : null}
+              <HeaderRow label={sec.label} cols={visible} teamMin={teamMin} confKey={sec.confKey} sortCol={sortCol} sortAsc={sortAsc} onSort={onSort} />
+              {sec.teams.map((team) => <TeamRow key={team.abbr} team={team} cols={visible} teamMin={teamMin} sortCol={sortCol} card={card} />)}
+            </View>
+          ))}
+          <Text style={{ color: t.subtle, fontSize: 11, padding: 12 }}>
+            {roomy ? 'Tap a column to sort.' : 'Tap a column to sort; rotate for more stats.'}
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );

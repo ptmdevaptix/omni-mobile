@@ -5,6 +5,7 @@ import { NewsCard } from '@/components/news-card';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { seasonOf, shortDate, timeOfDay } from '@/lib/format';
+import { useLayout } from '@/lib/layout';
 import { fetchTeamNews } from '@/lib/news';
 import { fetchTeamHome } from '@/lib/team';
 import type { DivTeam, Leader, MiniGame, TeamHomeData } from '@/lib/team-types';
@@ -12,6 +13,7 @@ import { useTheme } from '@/lib/theme';
 
 export function TeamHome({ teamId }: { teamId: string }) {
   const t = useTheme();
+  const layout = useLayout();
   const q = useQuery({ queryKey: ['team-home', teamId], queryFn: () => fetchTeamHome(teamId) });
 
   if (q.isLoading) return <StateView kind="loading" />;
@@ -23,52 +25,73 @@ export function TeamHome({ teamId }: { teamId: string }) {
   const upcoming = (d.nextTen ?? []).slice(0, 3);
   const games = [...recent, ...upcoming];
 
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 8 }}>
-      <TopNewsCard teamId={teamId} />
+  // The cards, in phone (single-column) order. On iPad they split into a wide "main" column and a
+  // narrower rail — the same shape as the team page on the web.
+  const newsCard = <TopNewsCard key="news" teamId={teamId} />;
 
-      {games.length ? (
-        <Card title="Recent & Upcoming">
-          {games.map((g, i) => {
-            // Between the end of one season and the start of the next, this list jumps months without
-            // saying so. A rule is enough to signal the break — no label needed.
-            const newSeason = i > 0 && seasonOf(games[i - 1].date) !== seasonOf(g.date);
-            return (
-              <View key={`${g.id}-${i}`}>
-                {newSeason ? <SeasonDivider /> : null}
-                <MiniGameRow g={g} />
-              </View>
-            );
-          })}
-        </Card>
-      ) : null}
-
-      {d.leaders?.points?.length ? (
-        <Card title="Team Leaders">
-          <LeaderRow label="Points" leaders={d.leaders.points} />
-          <LeaderRow label="Goals" leaders={d.leaders.goals} />
-          <LeaderRow label="Assists" leaders={d.leaders.assists} />
-        </Card>
-      ) : null}
-
-      {/* `> 0`, not `!= null` — the AHL/CHL/USHL endpoints hardcode 0 for special teams because
-          HockeyTech doesn't supply them, and 0 is not null. Rendering it claimed a 0.0% power play
-          and a rank of #0/0. This matches the web's guard in components/team-home.tsx. */}
-      {d.ppPct > 0 || d.pkPct > 0 ? (
-        <Card title="Special Teams">
-          <View style={styles.stRow}>
-            <Stat label="PP%" val={`${d.ppPct?.toFixed(1)}%`} rank={d.ppRank} total={d.totalTeams} />
-            <Stat label="PK%" val={`${d.pkPct?.toFixed(1)}%`} rank={d.pkRank} total={d.totalTeams} />
-            <Stat label="SOG/G" val={d.sogPerGame?.toFixed(1)} rank={d.sogPerGameRank} total={d.totalTeams} />
+  const gamesCard = games.length ? (
+    <Card key="games" title="Recent & Upcoming">
+      {games.map((g, i) => {
+        // Between the end of one season and the start of the next, this list jumps months without
+        // saying so. A rule is enough to signal the break — no label needed.
+        const newSeason = i > 0 && seasonOf(games[i - 1].date) !== seasonOf(g.date);
+        return (
+          <View key={`${g.id}-${i}`}>
+            {newSeason ? <SeasonDivider /> : null}
+            <MiniGameRow g={g} />
           </View>
-        </Card>
-      ) : null}
+        );
+      })}
+    </Card>
+  ) : null;
 
-      {d.division?.length ? (
-        <Card title={d.divisionName || 'Division'}>
-          {d.division.map((dt, i) => <DivRow key={`${dt.abbr}-${i}`} dt={dt} me={teamId} rank={i + 1} />)}
-        </Card>
-      ) : null}
+  const leadersCard = d.leaders?.points?.length ? (
+    <Card key="leaders" title="Team Leaders">
+      <LeaderRow label="Points" leaders={d.leaders.points} />
+      <LeaderRow label="Goals" leaders={d.leaders.goals} />
+      <LeaderRow label="Assists" leaders={d.leaders.assists} />
+    </Card>
+  ) : null;
+
+  // `> 0`, not `!= null` — the AHL/CHL/USHL endpoints hardcode 0 for special teams because
+  // HockeyTech doesn't supply them, and 0 is not null. Rendering it claimed a 0.0% power play and a
+  // rank of #0/0. This matches the web's guard in components/team-home.tsx.
+  const specialTeamsCard = d.ppPct > 0 || d.pkPct > 0 ? (
+    <Card key="special" title="Special Teams">
+      <View style={styles.stRow}>
+        <Stat label="PP%" val={`${d.ppPct?.toFixed(1)}%`} rank={d.ppRank} total={d.totalTeams} />
+        <Stat label="PK%" val={`${d.pkPct?.toFixed(1)}%`} rank={d.pkRank} total={d.totalTeams} />
+        <Stat label="SOG/G" val={d.sogPerGame?.toFixed(1)} rank={d.sogPerGameRank} total={d.totalTeams} />
+      </View>
+    </Card>
+  ) : null;
+
+  const divisionCard = d.division?.length ? (
+    <Card key="division" title={d.divisionName || 'Division'}>
+      {d.division.map((dt, i) => <DivRow key={`${dt.abbr}-${i}`} dt={dt} me={teamId} rank={i + 1} />)}
+    </Card>
+  ) : null;
+
+  const pad = layout.regular ? layout.gutter : 12;
+
+  if (layout.regular) {
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: pad, paddingBottom: 24 }}>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+          <View style={{ flex: 1.2, gap: 8 }}>{newsCard}{gamesCard}</View>
+          <View style={{ flex: 1, gap: 8 }}>{leadersCard}{specialTeamsCard}{divisionCard}</View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: pad, paddingBottom: 24, gap: 8 }}>
+      {newsCard}
+      {gamesCard}
+      {leadersCard}
+      {specialTeamsCard}
+      {divisionCard}
     </ScrollView>
   );
 }
