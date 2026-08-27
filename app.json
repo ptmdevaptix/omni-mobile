@@ -12,6 +12,9 @@
       "bundleIdentifier": "com.omnihockey.app",
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
       }
     },
     "android": {
