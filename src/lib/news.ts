@@ -19,27 +19,18 @@ export const fetchNews = (limit = 30) =>
     (r.items ?? []).map((it) => ({ ...it, title: (it.title ?? '').trim() })), // some feeds prepend whitespace
   );
 
-// League scope for a team's news, derived from its route id (bigger yield than the mixed feed).
-function newsScope(teamId: string): { league?: string; sub?: string } {
-  if (teamId.startsWith('ahl-')) return { league: 'AHL' };
-  if (teamId.startsWith('chl-ohl-')) return { league: 'CHL', sub: 'OHL' };
-  if (teamId.startsWith('chl-whl-')) return { league: 'CHL', sub: 'WHL' };
-  if (teamId.startsWith('chl-qmjhl-')) return { league: 'CHL', sub: 'QMJHL' };
-  if (teamId.startsWith('ncaa-')) return { league: 'NCAA' };
-  if (teamId.startsWith('ushl-')) return {};
-  return { league: 'NHL' };
-}
-
-// Recent news for a single team: scope to its league, then keep only articles tagged with this team.
-export async function fetchTeamNews(teamId: string, limit = 40): Promise<NewsItem[]> {
-  const { league, sub } = newsScope(teamId);
-  const qs = new URLSearchParams({ limit: String(limit) });
-  if (league) qs.set('league', league);
-  if (sub) qs.set('sub', sub);
-  const r = await api<{ items?: NewsItem[] }>(`/news?${qs.toString()}`);
-  return (r.items ?? [])
-    .map((it) => ({ ...it, title: (it.title ?? '').trim() }))
-    .filter((a) => (a.teamTags ?? []).some((tag) => tag.id === teamId));
+// Recent news for a single team.
+//
+// This used to fetch a page of the team's *league* and keep the articles carrying its tag, which
+// made a quiet club's one article disappear as soon as its league published enough to push it out of
+// the window. The API now answers per-team directly, holding an article for a fortnight regardless
+// of anyone else's publishing volume, so there is no league scope and no client-side filter here.
+export async function fetchTeamNews(teamId: string, limit = 10): Promise<NewsItem[]> {
+  const r = await api<{ items?: NewsItem[] }>(
+    `/news?team=${encodeURIComponent(teamId)}&limit=${limit}`,
+  );
+  // Some feeds prepend whitespace to the title.
+  return (r.items ?? []).map((it) => ({ ...it, title: (it.title ?? '').trim() }));
 }
 
 // "3h ago", "2d ago", or a short date for older items.

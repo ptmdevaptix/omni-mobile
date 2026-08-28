@@ -20,7 +20,7 @@ export function TeamNews({ teamId }: { teamId: string }) {
       contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: 24 }}
       data={q.data ?? []}
       keyExtractor={(a) => String(a.id)}
-      ListEmptyComponent={<StateView kind="empty" title="No recent news" message="No articles for this team right now." />}
+      ListEmptyComponent={<StateView kind="empty" title="No recent news" message="Nothing published about this team in the last two weeks." />}
       renderItem={({ item }) => <NewsCard a={item} />}
     />
   );

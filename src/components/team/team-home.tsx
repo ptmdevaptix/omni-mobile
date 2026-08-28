@@ -75,7 +75,7 @@ export function TeamHome({ teamId }: { teamId: string }) {
 
 // Most recent article for this team, shown at the top of the home tab (replaces the old playoff line).
 function TopNewsCard({ teamId }: { teamId: string }) {
-  const q = useQuery({ queryKey: ['team-news-top', teamId], queryFn: () => fetchTeamNews(teamId, 20), staleTime: 5 * 60_000 });
+  const q = useQuery({ queryKey: ['team-news-top', teamId], queryFn: () => fetchTeamNews(teamId, 10), staleTime: 5 * 60_000 });
   const top = q.data?.[0];
   if (!top) return null;
   return <NewsCard a={top} />;
