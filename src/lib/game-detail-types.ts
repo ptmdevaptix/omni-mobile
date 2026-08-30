@@ -12,7 +12,7 @@ export type GoalInfo = {
   awayScore: number; homeScore: number; isShootout?: boolean;
 };
 export type ScoringPeriod = { label: string; goals: GoalInfo[] };
-export type PenaltyInfo = { time: string; teamAbbr: string; player: string; description: string; duration: number };
+export type PenaltyInfo = { time: string; teamAbbr: string; player: string; description: string; duration: number; isPenaltyShot?: boolean };
 export type PenaltyPeriod = { label: string; penalties: PenaltyInfo[] };
 export type ThreeStar = { star: number; name: string; teamAbbr: string; goals: number; assists: number; points: number };
 

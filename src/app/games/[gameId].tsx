@@ -10,7 +10,7 @@ import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { shortDate, timeOfDay } from '@/lib/format';
 import { fetchGameDetail } from '@/lib/game';
-import type { GameDetail, GDTeam, GoalInfo } from '@/lib/game-detail-types';
+import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo } from '@/lib/game-detail-types';
 import { useTheme } from '@/lib/theme';
 
 export default function GameScreen() {
@@ -97,12 +97,17 @@ function LineScore({ g }: { g: GameDetail }) {
   const t = useTheme();
   const cols = g.periodScores ?? [];
   const cell = (v: number | null) => (v == null ? '–' : String(v));
+  // Shots on goal, as a column beside the goal total — where a box score puts it. Shown only when
+  // the league gives us the number: the NHL and the HockeyTech leagues do, NCAA doesn't, and an
+  // empty column reads as "nobody took a shot" rather than "not reported".
+  const hasSog = g.awayTeam.sog != null || g.homeTeam.sog != null;
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, paddingVertical: 8 }]}>
       <View style={styles.lsRow}>
         <Text style={[styles.lsTeam, { color: t.sub }]} />
         {cols.map((c, i) => <Text key={i} style={[styles.lsCell, { color: t.sub, fontWeight: '700' }]}>{c.label}</Text>)}
         <Text style={[styles.lsCell, { color: t.sub, fontWeight: '700' }]}>T</Text>
+        {hasSog ? <Text style={[styles.lsCell, { color: t.sub, fontWeight: '700' }]}>SOG</Text> : null}
       </View>
       {(['away', 'home'] as const).map((side) => {
         const team = side === 'away' ? g.awayTeam : g.homeTeam;
@@ -112,6 +117,7 @@ function LineScore({ g }: { g: GameDetail }) {
             <Text style={[styles.lsTeam, { color: t.text, fontWeight: '600' }]}>{team.abbr}</Text>
             {cols.map((c, i) => <Text key={i} style={[styles.lsCell, { color: t.text }]}>{cell(c[side])}</Text>)}
             <Text style={[styles.lsCell, { color: t.text, fontWeight: '800' }]}>{total}</Text>
+            {hasSog ? <Text style={[styles.lsCell, { color: t.sub }]}>{team.sog ?? '–'}</Text> : null}
           </View>
         );
       })}
@@ -165,14 +171,18 @@ function PlayedBody({ g }: { g: GameDetail }) {
       {g.penalties?.some((p) => p.penalties.length) ? (
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
           <Text style={[styles.section, { color: t.sub }]}>PENALTIES</Text>
-          {g.penalties.flatMap((p, pi) => p.penalties.map((pen, i) => (
-            <View key={`${pi}-${i}`} style={styles.penRow}>
-              <Text style={{ color: t.sub, fontSize: 15, fontWeight: '600', width: 46, fontVariant: ['tabular-nums'] }}>{pen.time}</Text>
-              <TeamLogo uri={logoFor(pen.teamAbbr)} darkUri={darkLogoFor(pen.teamAbbr)} size={22} />
-              <Text style={{ flex: 1, color: t.text, fontSize: 13 }} numberOfLines={1}>{pen.player} · {pen.description}</Text>
-              <Text style={{ color: t.sub, fontSize: 12 }}>{pen.duration}'</Text>
-            </View>
-          )))}
+          {/* Grouped by period, like SCORING above. Flattening these read as one list running from
+              0:00 to 20:00 three times over, with no way to tell which period a penalty was in. */}
+          {g.penalties.map((p, pi) => (
+            p.penalties.length ? (
+              <View key={pi} style={{ marginBottom: 6 }}>
+                <Text style={{ color: t.subtle, fontSize: 12, fontWeight: '700', marginTop: 6, marginBottom: 2 }}>{p.label}</Text>
+                {p.penalties.map((pen, i) => (
+                  <PenaltyRow key={i} pen={pen} logo={logoFor(pen.teamAbbr)} darkLogo={darkLogoFor(pen.teamAbbr)} />
+                ))}
+              </View>
+            ) : null
+          ))}
         </View>
       ) : null}
     </>
@@ -197,6 +207,28 @@ function GoalRow({ goal, logo, darkLogo }: { goal: GoalInfo; logo?: string; dark
   );
 }
 
+// Two lines, matching GoalRow: player on top, infraction beneath. On one line the infraction was
+// truncated for anything longer than a word or two — "Unsportsmanlike Cnd." and "Game Misc-Check to
+// Head" both ran off the end.
+function PenaltyRow({ pen, logo, darkLogo }: { pen: PenaltyInfo; logo?: string; darkLogo?: string }) {
+  const t = useTheme();
+  return (
+    <View style={styles.penRow}>
+      <Text style={{ color: t.sub, fontSize: 16, fontWeight: '600', width: 46, fontVariant: ['tabular-nums'] }}>{pen.time}</Text>
+      <TeamLogo uri={logo} darkUri={darkLogo} size={24} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{pen.player}</Text>
+        <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={2}>{pen.description}</Text>
+      </View>
+      {/* "2m", not "2'" — and not "2:00", which sits beside the period time in the same row and
+          would read as another clock rather than a length. */}
+      <Text style={{ color: t.sub, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+        {pen.isPenaltyShot ? 'PS' : `${pen.duration}m`}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 4 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
@@ -207,5 +239,5 @@ const styles = StyleSheet.create({
   lsCell: { flex: 1, textAlign: 'center', fontSize: 13, fontVariant: ['tabular-nums'] },
   starRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
   goalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
-  penRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  penRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
 });
