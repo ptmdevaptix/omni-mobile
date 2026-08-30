@@ -97,10 +97,15 @@ function LineScore({ g }: { g: GameDetail }) {
   const t = useTheme();
   const cols = g.periodScores ?? [];
   const cell = (v: number | null) => (v == null ? '–' : String(v));
-  // Shots on goal, as a column beside the goal total — where a box score puts it. Shown only when
-  // the league gives us the number: the NHL and the HockeyTech leagues do, NCAA doesn't, and an
-  // empty column reads as "nobody took a shot" rather than "not reported".
-  const hasSog = g.awayTeam.sog != null || g.homeTeam.sog != null;
+  // Shots on goal, as a column beside the goal total — where a box score puts it.
+  //
+  // Only when the league actually reports it. NCAA sends nothing at all, and the HockeyTech feeds
+  // send zeros for games where shots weren't tracked; both have to hide the column rather than show
+  // a blank or a 0-0, either of which reads as "nobody took a shot" instead of "not reported".
+  // One team above zero is proof shots are being tracked, so the other side's genuine 0 — a team
+  // five minutes into the first period — still prints as 0 rather than a dash.
+  const hasSog = [g.awayTeam, g.homeTeam].some((x) => typeof x.sog === 'number' && x.sog > 0);
+  const sogOf = (team: GDTeam) => (typeof team.sog === 'number' ? team.sog : '–');
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, paddingVertical: 8 }]}>
       <View style={styles.lsRow}>
@@ -117,7 +122,7 @@ function LineScore({ g }: { g: GameDetail }) {
             <Text style={[styles.lsTeam, { color: t.text, fontWeight: '600' }]}>{team.abbr}</Text>
             {cols.map((c, i) => <Text key={i} style={[styles.lsCell, { color: t.text }]}>{cell(c[side])}</Text>)}
             <Text style={[styles.lsCell, { color: t.text, fontWeight: '800' }]}>{total}</Text>
-            {hasSog ? <Text style={[styles.lsCell, { color: t.sub }]}>{team.sog ?? '–'}</Text> : null}
+            {hasSog ? <Text style={[styles.lsCell, { color: t.sub }]}>{sogOf(team)}</Text> : null}
           </View>
         );
       })}
