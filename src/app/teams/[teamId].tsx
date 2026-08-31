@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
 import { TeamHome } from '@/components/team/team-home';
@@ -16,6 +16,7 @@ import { TeamLogo } from '@/components/team-logo';
 import { api, leagueOf, teamHeaderPath } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
 import { teamTabs, type TeamTab } from '@/lib/team';
+import { teamLinkLabel, useTeamLinks } from '@/lib/team-links';
 import { useTheme } from '@/lib/theme';
 import type { TeamHeader } from '@/lib/types';
 
@@ -29,6 +30,7 @@ export default function TeamScreen() {
 
   const q = useQuery({ queryKey: ['team-header', teamId], queryFn: () => api<TeamHeader>(teamHeaderPath(teamId)) });
   const team = q.data;
+  const links = useTeamLinks(teamId);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -49,6 +51,24 @@ export default function TeamScreen() {
               <Text style={{ color: t.sub, fontSize: 13, marginTop: 1 }} numberOfLines={1}>
                 {[leagueOf(teamId), team.division, team.record].filter(Boolean).join(' · ')}
               </Text>
+              {/* Rendered from the array, so a new linkType is a seeder change and needs no edit here.
+                  Empty while loading AND when a club has no verified links — both render nothing,
+                  deliberately: an unverified club shows no link rather than a guessed one. */}
+              {links.length > 0 ? (
+                <View style={{ flexDirection: 'row', gap: 14, marginTop: 5 }}>
+                  {links.map((link) => (
+                    <Pressable
+                      key={link.linkType}
+                      onPress={() => Linking.openURL(link.url)}
+                      hitSlop={8}
+                      accessibilityRole="link"
+                      accessibilityLabel={`${team.name} ${link.linkType === 'web' ? 'official site' : `on ${link.linkType}`}`}
+                    >
+                      <Text style={{ color: t.accent, fontSize: 12, fontWeight: '600' }}>{teamLinkLabel(link)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
             <Pressable onPress={() => toggle(teamId)} hitSlop={10} accessibilityLabel={isFavorite(teamId) ? 'Remove favorite' : 'Add favorite'}>
               <SymbolView name={isFavorite(teamId) ? 'star.fill' : 'star'} tintColor={isFavorite(teamId) ? '#f5a623' : t.subtle} size={26} />

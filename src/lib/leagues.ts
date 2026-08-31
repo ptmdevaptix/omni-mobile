@@ -198,7 +198,10 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
     name: r.name,
     abbr: r.abbr,
     logo: r.logo,
-    conference: r.conference ?? "Independent",
+    // NCAA_INDEPENDENTS, not "Independent" — the singular spelling used to be the fallback here, which
+    // would have rendered a second, near-empty group beside the real one for any team missing a
+    // conference. The API's own bucket is plural.
+    conference: r.conference ?? NCAA_INDEPENDENTS,
     routeId: `ncaa-${r.seo}`,
     oW: r.oW ?? 0, oL: r.oL ?? 0, oT: r.oT ?? 0,
     cW: r.cW ?? 0, cL: r.cL ?? 0, cT: r.cT ?? 0, cPts: r.cPts ?? 0,
@@ -210,7 +213,7 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
   }
   return [...byConf.entries()]
     .map(([conference, list]) => ({ conference, teams: list.sort((a, b) => b.cPts - a.cPts || b.cW - a.cW) }))
-    .sort((a, b) => a.conference.localeCompare(b.conference));
+    .sort((a, b) => compareNcaaConferences(a.conference, b.conference));
 }
 
 // Home hub: league grouping order for the aggregated scoreboard, keyed by game.top.
@@ -231,6 +234,33 @@ const LEAGUE_ORDER: Record<Region, readonly string[]> = {
 // Section order for the Home hub, by the device's region.
 export function homeLeagueOrder(region: Region = detectRegion()): readonly string[] {
   return LEAGUE_ORDER[region] ?? LEAGUE_ORDER.INTL;
+}
+
+/**
+ * The family a league section belongs to, matching `interleagueParent` on a game.
+ *
+ * Used to place an interleague section with its own family rather than at a fixed position — the
+ * regional orderings above move NCAA around, and "Interleague (CHL)" has to travel with OHL/WHL/QMJHL
+ * rather than sitting wherever it was hardcoded.
+ */
+/**
+ * NCAA conference display order: alphabetical, with Independents ALWAYS last.
+ *
+ * Independents is not a conference; it is the bucket for teams belonging to none. Plain alphabetical
+ * sorting drops it between Hockey East and NCHC, presenting it as a peer of the real conferences.
+ * Mirrors lib/ncaa-conferences.ts in the web repo — the two must not drift.
+ */
+export const NCAA_INDEPENDENTS = 'Independents';
+
+export function compareNcaaConferences(a: string, b: string): number {
+  const aLast = a === NCAA_INDEPENDENTS ? 1 : 0;
+  const bLast = b === NCAA_INDEPENDENTS ? 1 : 0;
+  return aLast - bLast || a.localeCompare(b);
+}
+
+export function leagueFamily(label: string): string {
+  const l = label.toUpperCase();
+  return l === 'OHL' || l === 'WHL' || l === 'QMJHL' ? 'CHL' : l;
 }
 
 // The same order applied to the picker entries, so the pills and the Home sections agree. Any league
