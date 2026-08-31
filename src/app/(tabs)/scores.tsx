@@ -8,7 +8,7 @@ import { LeaguePicker } from '@/components/league-picker';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { dayKey, dayLabel, daysBetween } from '@/lib/format';
-import { fetchGameDays, fetchScores, leagueColors, useLeague, type LeagueId } from '@/lib/leagues';
+import { fetchGameDays, fetchScores, hasLiveGame, leagueColors, LIVE_MAX_AGE_MS, useLeague, type LeagueId } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -153,17 +153,27 @@ function SlatePage({ league, date, width }: { league: LeagueId; date?: string; w
   const q = useQuery({
     queryKey: ['scores', league, date ?? 'live'],
     queryFn: () => fetchScores(league, date),
-    refetchInterval: 30_000,
+    refetchInterval: (query) => (hasLiveGame(query.state.data?.games) ? 10_000 : 30_000),
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   });
   const { refreshing, onRefresh } = usePullRefresh(q.refetch);
 
-  const games = q.data?.games ?? [];
-  const teams = q.data?.teamsById ?? {};
+  // Same reasoning as Home (src/app/(tabs)/index.tsx): swiping away or opening a game unmounts this
+  // list and stops the interval, and React Query hands the payload straight back on return. A finished
+  // slate is fine from cache; a game in progress would re-render the clock it had when you left.
+  const stale = Date.now() - q.dataUpdatedAt > LIVE_MAX_AGE_MS && hasLiveGame(q.data?.games);
+  const data = stale ? undefined : q.data;
+
+  const games = data?.games ?? [];
+  const teams = data?.teamsById ?? {};
   const rows = useMemo(() => toRows(games, compact ? 2 : 1), [games, compact]);
 
   return (
     <View style={{ width, flex: 1 }}>
-      {q.isLoading ? (
+      {/* `stale` as well as isLoading — isLoading is false whenever a cached payload exists, so a
+          suppressed one would otherwise fall through to the "No games" empty state. */}
+      {q.isLoading || stale ? (
         <StateView kind="loading" />
       ) : q.isError ? (
         <StateView kind="error" message="Couldn’t load scores." onRetry={() => q.refetch()} />

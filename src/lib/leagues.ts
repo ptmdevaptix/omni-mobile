@@ -222,6 +222,24 @@ export async function fetchAllScores(): Promise<{
   return { games, teamsById };
 }
 
+// ── Live-score freshness ──────────────────────────────────────────────────────
+//
+// Shared by Home and the Scores tab so the two screens can't drift apart on this.
+//
+// React Query keeps a payload for gcTime (5 min) and hands it straight back when a screen remounts.
+// For a finished slate that is exactly what you want — the results are not going to change, and it
+// paints instantly. For a game in progress it is the opposite: leaving the tab stops refetchInterval,
+// so returning re-renders the clock, period and score as they were when you left. That is how a game
+// already at "3rd • 09:35" showed on the card as "3rd • 20:00" after navigating back from its own
+// detail page.
+//
+// So: a cached payload containing a live game is only usable for a few seconds. 30s sits comfortably
+// past the 10s live poll, keeping the instant paint for a quick there-and-back.
+
+export const LIVE_MAX_AGE_MS = 30_000;
+
+export const hasLiveGame = (games: ScoreGame[] | undefined) => !!games?.some((g) => g.status === "LIVE");
+
 // All teams across every league (for search). `id` is already the /teams/<id> route id per league.
 export type TeamDirectoryEntry = { id: string; league: string; name: string; abbr: string; logo?: string; darkLogo?: string; group?: string };
 export async function fetchAllTeams(): Promise<TeamDirectoryEntry[]> {

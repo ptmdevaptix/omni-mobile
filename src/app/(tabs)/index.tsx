@@ -8,7 +8,7 @@ import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
-import { fetchAllScores, gameLeague, homeLeagueOrder } from '@/lib/leagues';
+import { fetchAllScores, gameLeague, hasLiveGame, homeLeagueOrder, LIVE_MAX_AGE_MS } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -28,17 +28,36 @@ export default function HomeScreen() {
   const t = useTheme();
   const { favorites } = useFavorites();
   const { compact } = useCompact();
-  const q = useQuery({ queryKey: ['all-scores'], queryFn: fetchAllScores, refetchInterval: 30_000 });
+  const q = useQuery({
+    queryKey: ['all-scores'],
+    queryFn: fetchAllScores,
+    // Poll faster while something is actually being played. A fixed 30s meant a live clock could sit
+    // half a minute behind, which reads as wrong rather than merely delayed.
+    refetchInterval: (query) => (hasLiveGame(query.state.data?.games) ? 10_000 : 30_000),
+    // The global default is refetchOnWindowFocus: false, to stop a flapping focus state from storming
+    // every query. Scores are the one case where returning to the app must re-check immediately.
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+  });
 
   const { refreshing, onRefresh } = usePullRefresh(q.refetch);
-  const teams = q.data?.teamsById ?? {};
-  const sections = useMemo(() => buildSections(q.data?.games ?? [], favorites), [q.data, favorites]);
+
+  // A cached payload holding a live game goes stale in seconds — see LIVE_MAX_AGE_MS in lib/leagues.
+  // Suppress it rather than re-render the clock this screen had when you left it.
+  const stale = Date.now() - q.dataUpdatedAt > LIVE_MAX_AGE_MS && hasLiveGame(q.data?.games);
+  const data = stale ? undefined : q.data;
+
+  const teams = data?.teamsById ?? {};
+  const sections = useMemo(() => buildSections(data?.games ?? [], favorites), [data, favorites]);
   const rowSections = useMemo<RowSection[]>(() => sections.map((s) => ({ ...s, data: toRows(s.data, compact ? 2 : 1) })), [sections, compact]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <MyTeamsBar />
-      {q.isLoading ? (
+      {/* `stale` matters here as much as isLoading: isLoading is false whenever a cached payload
+          exists, so without it a suppressed payload would fall through to an empty list and render
+          the "No games today" empty state — worse than the stale clock it replaced. */}
+      {q.isLoading || stale ? (
         <StateView kind="loading" />
       ) : q.isError ? (
         <StateView kind="error" message="Couldn’t load scores." onRetry={() => q.refetch()} />
