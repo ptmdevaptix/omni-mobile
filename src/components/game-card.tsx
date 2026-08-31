@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { cardDate } from '@/lib/format';
-import { gameLeague } from '@/lib/leagues';
+import { gameLeague, isInterleague } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame, ScoreTeam } from '@/lib/types';
 
@@ -46,7 +46,13 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const openGame = () => router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
   // Navigate with the canonical id so the team page, its endpoint and the ★ all agree — the CHL
   // scoreboard's own ids ("qmjhl-2") are not valid /teams ids.
-  const openTeam = (id: string) => router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(id) } });
+  // A team the API could not match to a real team page — the interleague CHL case, where one league's
+  // feed refers to a visiting team by an id meaningless outside it. Tapping it used to land on
+  // "Something went wrong"; opening the game instead is the useful fallback.
+  const openTeam = (id: string, team: ScoreTeam) =>
+    team.linkable === false
+      ? openGame()
+      : router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(id) } });
 
   const content = compact ? (
     <>
@@ -56,14 +62,18 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
           {[dateLabel || null, game.statusLabel].filter(Boolean).join(' · ')}
         </Text>
       </View>
-      <TeamLine compact team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId)} />
-      <TeamLine compact team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId)} />
+      <TeamLine compact team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
+      <TeamLine compact team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
     </>
   ) : (
     <>
       <View style={styles.leagueRow}>
-        {/* gameLeague(), not game.top — CHL feeds label every OHL/WHL/QMJHL game as "CHL". */}
-        <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>{gameLeague(game)}</Text>
+        {/* gameLeague(), not game.top — CHL feeds label every OHL/WHL/QMJHL game as "CHL".
+            An interleague fixture names both, in away-then-home order to match the two rows below;
+            a single league badge on a cross-league game reads as though it were an ordinary one. */}
+        <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>
+          {isInterleague(game) ? game.leagues!.join(' · ') : gameLeague(game)}
+        </Text>
         {game.preseason ? <Text style={[styles.badge, styles.preBadge, preColors(t.mode)]}>PRE</Text> : null}
         {/* statusLabel is time-only ("5:00 PM ET"), which is ambiguous the moment a card isn't from
             today — and the Home hub now mixes leagues on different days. Date shown only when needed. */}
@@ -71,8 +81,8 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
           {dateLabel ? `${dateLabel} · ${game.statusLabel}` : game.statusLabel}
         </Text>
       </View>
-      <TeamLine team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId)} />
-      <TeamLine team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId)} />
+      <TeamLine team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
+      <TeamLine team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
       {game.network ? <Text style={{ color: t.sub, fontSize: 11, marginTop: 4 }}>📺 {game.network}</Text> : null}
     </>
   );

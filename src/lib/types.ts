@@ -8,6 +8,12 @@ export type ScoreGame = {
   // OHL/WHL/QMJHL games all carry top: "CHL". Use gameLeague() from lib/leagues to get the real one.
   top: string;
   path?: string[]; // breadcrumb; path[0] is the sub-league for CHL feeds (e.g. ["QMJHL"])
+  // Every league involved, when more than one — an interleague CHL game, e.g. ["OHL","QMJHL"].
+  // Absent for an ordinary game. Set by the API so both clients group and filter identically.
+  leagues?: string[];
+  // The family both sides share ("CHL"), so the section reads "Interleague (CHL)". Absent when they
+  // share none — an NCAA side playing U Sports — which groups under a plain "Interleague".
+  interleagueParent?: string;
   awayTeamId: string;
   homeTeamId: string;
   status: "UPCOMING" | "LIVE" | "FINAL" | string;
@@ -22,7 +28,13 @@ export type ScoreGame = {
 
 // NHL /scores enriches teams with location + nickname (there is no single `name` field here, unlike
 // /nhl-standings). Display name = `${location} ${nickname}`.trim(), falling back to abbr.
-export type ScoreTeam = { location?: string; nickname?: string; name?: string; abbr?: string; logo?: string; darkLogo?: string };
+export type ScoreTeam = {
+  location?: string; nickname?: string; name?: string; abbr?: string; logo?: string; darkLogo?: string;
+  // False when the API could not match this team to a real team page — an interleague CHL game, where
+  // one league's feed names a visiting team with an id meaningless outside it. Undefined means
+  // linkable, so nothing that predates this field changes behaviour.
+  linkable?: boolean;
+};
 
 export type ScoresResponse = {
   games: ScoreGame[];

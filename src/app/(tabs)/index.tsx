@@ -8,7 +8,7 @@ import { MyTeamsBar } from '@/components/my-teams-bar';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
-import { fetchAllScores, gameLeague, hasLiveGame, homeLeagueOrder, LIVE_MAX_AGE_MS } from '@/lib/leagues';
+import { fetchAllScores, gameLeague, hasLiveGame, homeLeagueOrder, interleagueTitle, isInterleague, LIVE_MAX_AGE_MS } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -114,8 +114,27 @@ function buildSections(games: ScoreGame[], favorites: string[]): Section[] {
   if (live.length) sections.push({ title: 'Live Scores', live: true, data: live });
 
   const remaining = games.filter((g) => !shown.has(g.id));
+
+  // Interleague fixtures get their own section rather than being filed under whichever league happened
+  // to host. Putting an OHL-vs-QMJHL game under "QMJHL" is arbitrary and misleading — it reads as a
+  // QMJHL game — and the single card is the point: the API already collapsed the two feed copies.
+  // Placed ahead of the per-league sections because a cross-league matchup is the more notable event.
+  //
+  // Grouped BY SCOPE, not into one bucket: "Interleague (CHL)" and a future "Interleague (NCAA)" are
+  // unrelated events and must not share a section. Insertion order is preserved so the scopes appear
+  // in the order their games do rather than alphabetically.
+  const crossByTitle = new Map<string, ScoreGame[]>();
+  for (const g of remaining) {
+    if (!isInterleague(g)) continue;
+    const title = interleagueTitle(g);
+    if (!crossByTitle.has(title)) crossByTitle.set(title, []);
+    crossByTitle.get(title)!.push(g);
+    shown.add(g.id);
+  }
+  for (const [title, data] of crossByTitle) sections.push({ title, data });
+
   for (const lg of homeLeagueOrder()) {
-    const grp = remaining.filter((g) => gameLeague(g) === lg);
+    const grp = remaining.filter((g) => !shown.has(g.id) && gameLeague(g) === lg);
     if (grp.length) sections.push({ title: lg, data: grp });
   }
   return sections;

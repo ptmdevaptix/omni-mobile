@@ -78,7 +78,44 @@ export function gameLeague(g: ScoreGame): string {
   return (g.top ?? "").toUpperCase();
 }
 
-const inLeague = (g: ScoreGame, code: string) => gameLeague(g) === code.toUpperCase();
+/** True when this fixture is between two leagues (an OHL side visiting a QMJHL rink, say). */
+export const isInterleague = (g: ScoreGame): boolean => (g.leagues?.length ?? 0) > 1;
+
+/**
+ * Each family names cross-league play in its own vernacular. "Interleague" is the CHL's word for an
+ * OHL side visiting a QMJHL rink; college hockey calls the same idea non-conference, and would read a
+ * section headed "Interleague (NCAA)" as jargon from another sport.
+ */
+const INTERLEAGUE_LABEL: Record<string, string> = {
+  NCAA: 'NCAA Non-Conf.',
+};
+
+/**
+ * Section title for an interleague fixture, scoped to the family both sides belong to:
+ *
+ *   OHL vs QMJHL      → "Interleague (CHL)"
+ *   NCAA cross-conf.  → "NCAA Non-Conf."       (when conference grouping arrives)
+ *   NCAA vs U Sports  → "Interleague"          — no shared parent
+ *
+ * Scoping matters because a bare "Interleague" stops being meaningful the moment a second family can
+ * produce one: two unrelated fixtures would collapse into one section. The parent comes from the API
+ * so both clients label identically.
+ */
+export const interleagueTitle = (g: ScoreGame): string => {
+  const parent = g.interleagueParent;
+  if (!parent) return 'Interleague';
+  return INTERLEAGUE_LABEL[parent] ?? `Interleague (${parent})`;
+};
+
+/**
+ * A game belongs to a league tab if it is that league's own game OR it is an interleague fixture
+ * involving it. The API dedupes an interleague game to a single entry filed under the host league, so
+ * without the second test an OHL supporter would not find their team's game on the OHL tab at all.
+ */
+const inLeague = (g: ScoreGame, code: string) => {
+  const c = code.toUpperCase();
+  return gameLeague(g) === c || !!g.leagues?.includes(c);
+};
 
 // Scores for one league. `date` omitted = whatever the feed considers current (the NHL feed answers with
 // the next day that has games, rather than an empty today).
