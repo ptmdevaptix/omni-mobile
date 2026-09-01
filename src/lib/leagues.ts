@@ -258,6 +258,29 @@ export function compareNcaaConferences(a: string, b: string): number {
   return aLast - bLast || a.localeCompare(b);
 }
 
+// NHL divisions in conference order (Eastern, then Western) rather than alphabetically, matching the
+// web team grid. Alphabetical interleaves the conferences: Atlantic, Central, Metropolitan, Pacific.
+const NHL_DIVISION_ORDER = ['Atlantic', 'Metropolitan', 'Central', 'Pacific'];
+
+/**
+ * Order the group headers on the Teams screen.
+ *
+ * Per league, because the right order differs: the NHL has a real conference sequence, the NCAA wants
+ * Independents pinned last (it is a residual bucket, not a conference), and everything else reads fine
+ * alphabetically.
+ */
+export function compareTeamGroups(league: LeagueId, a: string, b: string): number {
+  if (league === 'ncaa') return compareNcaaConferences(a, b);
+  if (league === 'nhl') {
+    const rank = (g: string) => {
+      const i = NHL_DIVISION_ORDER.indexOf(g);
+      return i === -1 ? NHL_DIVISION_ORDER.length : i;   // unknown divisions sort last, still shown
+    };
+    return rank(a) - rank(b) || a.localeCompare(b);
+  }
+  return a.localeCompare(b);
+}
+
 export function leagueFamily(label: string): string {
   const l = label.toUpperCase();
   return l === 'OHL' || l === 'WHL' || l === 'QMJHL' ? 'CHL' : l;

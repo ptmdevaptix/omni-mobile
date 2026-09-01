@@ -22,13 +22,18 @@ export function TeamHome({ teamId }: { teamId: string }) {
   const recent = (d.lastFive ?? []).slice(-3);
   const upcoming = (d.nextTen ?? []).slice(0, 3);
   const games = [...recent, ...upcoming];
+  // Title follows the contents. Before a season starts there are no completed games to show for the
+  // NHL or NCAA — both scope to the current season — so "Recent & Upcoming" promised a half the card
+  // did not have. (The AHL and CHL do fill it, but with LAST season's games, which is why they looked
+  // like the ones that worked.)
+  const cardTitle = recent.length ? 'Recent & Upcoming' : 'Upcoming';
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={{ padding: 12, paddingBottom: 24, gap: 8 }}>
       <TopNewsCard teamId={teamId} />
 
       {games.length ? (
-        <Card title="Recent & Upcoming">
+        <Card title={cardTitle}>
           {games.map((g, i) => {
             // Between the end of one season and the start of the next, this list jumps months without
             // saying so. A rule is enough to signal the break — no label needed.

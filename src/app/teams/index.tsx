@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
-import { fetchAllTeams, LEAGUES, leagueById, leagueColors, type LeagueId, type TeamDirectoryEntry } from '@/lib/leagues';
+import { compareTeamGroups, fetchAllTeams, LEAGUES, leagueById, leagueColors, type LeagueId, type TeamDirectoryEntry } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
 // Team browser (reached from More → Teams). Local league picker (it's outside the tabs' shared league
@@ -28,7 +28,8 @@ export default function TeamsBrowserScreen() {
     }
     return [...byGroup.entries()]
       .map(([name, list]) => ({ name, teams: list.sort((a, b) => a.name.localeCompare(b.name)) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      // Per-league order: NHL divisions in conference sequence, NCAA with Independents last.
+      .sort((a, b) => compareTeamGroups(league, a.name, b.name));
   }, [q.data, league]);
 
   return (

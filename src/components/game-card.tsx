@@ -68,13 +68,18 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   ) : (
     <>
       <View style={styles.leagueRow}>
-        {/* gameLeague(), not game.top — CHL feeds label every OHL/WHL/QMJHL game as "CHL".
-            An interleague fixture names both, in away-then-home order to match the two rows below;
-            a single league badge on a cross-league game reads as though it were an ordinary one. */}
-        <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>
-          {isInterleague(game) ? game.leagues!.join(' · ') : gameLeague(game)}
-        </Text>
-        {game.preseason ? <Text style={[styles.badge, styles.preBadge, preColors(t.mode)]}>PRE</Text> : null}
+        {/* PRE is grouped WITH the league badge rather than left as a third child of the row. The row
+            is space-between, so a bare third child floated to the middle and read as though it
+            belonged to neither end — it qualifies the league, so it sits against it. */}
+        <View style={styles.leagueBadges}>
+          {/* gameLeague(), not game.top — CHL feeds label every OHL/WHL/QMJHL game as "CHL".
+              An interleague fixture names both, in away-then-home order to match the two rows below;
+              a single league badge on a cross-league game reads as though it were an ordinary one. */}
+          <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>
+            {isInterleague(game) ? game.leagues!.join(' · ') : gameLeague(game)}
+          </Text>
+          {game.preseason ? <Text style={[styles.badge, styles.preBadge, preColors(t.mode)]}>PRE</Text> : null}
+        </View>
         {/* statusLabel is time-only ("5:00 PM ET"), which is ambiguous the moment a card isn't from
             today — and the Home hub now mixes leagues on different days. Date shown only when needed. */}
         <Text style={{ color: live ? t.live : t.sub, fontSize: 12, fontWeight: live ? '700' : '400' }}>
@@ -155,6 +160,8 @@ const styles = StyleSheet.create({
   metalFrame: { borderRadius: 14.5, padding: 2 },
   metalShadow: { borderRadius: 14.5, shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   leagueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  // The left end of leagueRow: league badge + any qualifier (PRE), kept together against the edge.
+  leagueBadges: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
   badge: { fontSize: 10, fontWeight: '700', borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   // Filled rather than outlined, so "this result doesn't count" reads at a glance instead of blending
   // into the league badge beside it.
