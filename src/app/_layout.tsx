@@ -7,6 +7,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { CompactModeProvider } from '@/lib/compact';
 import { FavoritesProvider } from '@/lib/favorites';
+import { FollowedLeaguesProvider } from '@/lib/followed-leagues';
 import { NotificationPrefsProvider } from '@/lib/notification-prefs';
 import { useNotificationTaps, usePushSync } from '@/lib/push';
 import { queryClient } from '@/lib/query';
@@ -58,9 +59,11 @@ export default function RootLayout() {
       <ThemeModeProvider>
         <CompactModeProvider>
           <FavoritesProvider>
-            <NotificationPrefsProvider>
-              <RootNav />
-            </NotificationPrefsProvider>
+            <FollowedLeaguesProvider>
+              <NotificationPrefsProvider>
+                <RootNav />
+              </NotificationPrefsProvider>
+            </FollowedLeaguesProvider>
           </FavoritesProvider>
         </CompactModeProvider>
       </ThemeModeProvider>

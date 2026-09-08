@@ -56,6 +56,7 @@ export function canonicalTeamId(teamId: string): string {
 export function teamHeaderPath(rawId: string): string {
   const teamId = canonicalTeamId(rawId);
   if (teamId.startsWith("ahl-")) return `/ahl-team/${teamId.slice(4)}`;
+  if (teamId.startsWith("echl-")) return `/echl-team/${teamId.slice(5)}`; // keyed on the club's slug
   if (teamId.startsWith("chl-")) return `/chl-team/${teamId.slice(4)}`;
   if (teamId.startsWith("ncaa-")) return `/ncaa-team/${teamId.slice(5)}`;
   if (teamId.startsWith("ushl-")) return `/ushl-team/${teamId.slice(5)}`;
@@ -65,6 +66,7 @@ export function teamHeaderPath(rawId: string): string {
 export function leagueOf(rawId: string): string {
   const teamId = canonicalTeamId(rawId);
   if (teamId.startsWith("ahl-")) return "AHL";
+  if (teamId.startsWith("echl-")) return "ECHL";
   if (teamId.startsWith("chl-")) return "CHL";
   if (teamId.startsWith("ncaa-")) return "NCAA";
   if (teamId.startsWith("ushl-")) return "USHL";

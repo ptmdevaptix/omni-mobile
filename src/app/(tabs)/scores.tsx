@@ -4,11 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { GameCard } from '@/components/game-card';
+import { SubHeading } from '@/components/sub-heading';
 import { LeaguePicker } from '@/components/league-picker';
 import { StateView } from '@/components/state-view';
 import { useCompact } from '@/lib/compact';
+import { useFavorites } from '@/lib/favorites';
 import { dayKey, dayLabel, daysBetween } from '@/lib/format';
-import { fetchGameDays, fetchScores, hasLiveGame, leagueColors, LIVE_MAX_AGE_MS, useLeague, type LeagueId } from '@/lib/leagues';
+import { favMatchIds, isFavGame } from '@/lib/home';
+import { fetchGameDays, fetchScores, groupNcaaByConference, hasLiveGame, leagueColors, LIVE_MAX_AGE_MS, useLeague, type LeagueId } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -165,9 +168,23 @@ function SlatePage({ league, date, width }: { league: LeagueId; date?: string; w
   const stale = Date.now() - q.dataUpdatedAt > LIVE_MAX_AGE_MS && hasLiveGame(q.data?.games);
   const data = stale ? undefined : q.data;
 
-  const games = data?.games ?? [];
+  // Favorites lead their league's slate and wear the metallic frame — the one place a favorite sits
+  // among its peers, so the marker earns its keep here (Home's Favorites section is its own header).
+  const { favorites } = useFavorites();
+  const favIds = useMemo(() => favMatchIds(favorites), [favorites]);
+  const games = useMemo(() => {
+    const all = data?.games ?? [];
+    if (!favIds.size) return all;
+    return [...all].sort((a, b) => Number(isFavGame(b, favIds)) - Number(isFavGame(a, favIds))); // stable
+  }, [data, favIds]);
   const teams = data?.teamsById ?? {};
-  const rows = useMemo(() => toRows(games, compact ? 2 : 1), [games, compact]);
+  // The NCAA slate carries a conference sub-heading before each run (Non-Conference last); every other
+  // league is one flat run. Favorites still lead within their run.
+  const rows = useMemo<Row[]>(() => {
+    const per = compact ? 2 : 1;
+    if (league !== 'ncaa' || !games.some((g) => g.conference)) return toRows(games, per);
+    return groupNcaaByConference(games).flatMap(([heading, grp]) => [{ heading }, ...toRows(grp, per)]);
+  }, [games, compact, league]);
 
   return (
     <View style={{ width, flex: 1 }}>
@@ -183,20 +200,27 @@ function SlatePage({ league, date, width }: { league: LeagueId; date?: string; w
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 12, gap: 10 }}
           data={rows}
-          keyExtractor={(row) => row[0].id}
+          keyExtractor={(row) => (isHeading(row) ? `h:${row.heading}` : row[0].id)}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
           ListEmptyComponent={<StateView kind="empty" title="No games" message="Nothing scheduled for this league right now." />}
-          renderItem={({ item }) => (
-            <View style={compact ? { flexDirection: 'row', gap: 10 } : undefined}>
-              {item.map((g) => <GameCard key={g.id} game={g} teams={teams} cardColor={c.card} compact={compact} />)}
-              {compact && item.length === 1 ? <View style={{ flex: 1 }} /> : null}
-            </View>
-          )}
+          renderItem={({ item }) =>
+            isHeading(item) ? (
+              <SubHeading title={item.heading} />
+            ) : (
+              <View style={compact ? { flexDirection: 'row', gap: 10 } : undefined}>
+                {item.map((g) => <GameCard key={g.id} game={g} teams={teams} cardColor={c.card} compact={compact} featured={isFavGame(g, favIds)} />)}
+                {compact && item.length === 1 ? <View style={{ flex: 1 }} /> : null}
+              </View>
+            )
+          }
         />
       )}
     </View>
   );
 }
+
+type Row = ScoreGame[] | { heading: string };
+const isHeading = (r: Row): r is { heading: string } => !Array.isArray(r);
 
 const styles = StyleSheet.create({
   header: {

@@ -43,7 +43,13 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const awayResult: Result = !final ? undefined : aw === hm ? 'tie' : aw > hm ? 'win' : 'loss';
   const homeResult: Result = !final ? undefined : hm === aw ? 'tie' : hm > aw ? 'win' : 'loss';
 
-  const openGame = () => router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
+  // The ECHL has no game-detail pages — its schedule is seeded from the clubs' iCal feeds, which carry
+  // no league game id — so its cards don't navigate, the same call the web makes. Team taps still work.
+  const hasDetail = game.top !== 'ECHL';
+  const openGame = () => {
+    if (!hasDetail) return;
+    router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
+  };
   // Navigate with the canonical id so the team page, its endpoint and the ★ all agree — the CHL
   // scoreboard's own ids ("qmjhl-2") are not valid /teams ids.
   // A team the API could not match to a real team page — the interleague CHL case, where one league's

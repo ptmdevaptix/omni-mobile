@@ -6,7 +6,7 @@ import { api } from "./api";
 import { detectRegion, type Region } from "./region";
 import type { ScoreGame, ScoresResponse, ScoreTeam, StandingsTeam } from "./types";
 
-export type LeagueId = "nhl" | "ahl" | "ohl" | "whl" | "qmjhl" | "ushl" | "ncaa";
+export type LeagueId = "nhl" | "ahl" | "echl" | "ohl" | "whl" | "qmjhl" | "ushl" | "ncaa";
 
 export type LeagueConfig = {
   id: LeagueId;
@@ -16,14 +16,17 @@ export type LeagueConfig = {
   chlCode?: string; // for OHL/WHL/QMJHL: filter the combined /chl-scores feed by game.top
   standingsPath: string;
   standingsKind: "wlotl" | "ncaa"; // NHL/AHL/CHL vs NCAA (W-L-T, conference-based)
-  statsPath: string;
-  teamKind: "nhl" | "ahl" | "chl" | "ushl" | "ncaa"; // how to build a /teams/<id> route id from a standings row
+  statsPath: string; // "" = no leader boards for this league
+  teamKind: "nhl" | "ahl" | "echl" | "chl" | "ushl" | "ncaa"; // how to build a /teams/<id> route id from a standings row
   hasConferences?: boolean; // NCAA
 };
 
 export const LEAGUES: LeagueConfig[] = [
   { id: "nhl", label: "NHL", name: "National Hockey League", scoresPath: "/scores", standingsPath: "/nhl-standings", standingsKind: "wlotl", statsPath: "/nhl-stats", teamKind: "nhl" },
   { id: "ahl", label: "AHL", name: "American Hockey League", scoresPath: "/ahl-scores", standingsPath: "/ahl-standings", standingsKind: "wlotl", statsPath: "/ahl-stats", teamKind: "ahl" },
+  // Scores are a seeded slate + results overlay and there is no stats feed, so no leader boards; the
+  // web's ECHL team pages carry identity + affiliations, schedule and roster, and so do ours.
+  { id: "echl", label: "ECHL", name: "ECHL", scoresPath: "/echl-scores", standingsPath: "/echl-standings", standingsKind: "wlotl", statsPath: "", teamKind: "echl" },
   { id: "ohl", label: "OHL", name: "Ontario Hockey League", scoresPath: "/chl-scores", chlCode: "OHL", standingsPath: "/ht-standings/ohl", standingsKind: "wlotl", statsPath: "/chl-stats/ohl", teamKind: "chl" },
   { id: "whl", label: "WHL", name: "Western Hockey League", scoresPath: "/chl-scores", chlCode: "WHL", standingsPath: "/ht-standings/whl", standingsKind: "wlotl", statsPath: "/chl-stats/whl", teamKind: "chl" },
   { id: "qmjhl", label: "QMJHL", name: "Quebec Maritimes Junior Hockey League", scoresPath: "/chl-scores", chlCode: "QMJHL", standingsPath: "/ht-standings/qmjhl", standingsKind: "wlotl", statsPath: "/chl-stats/qmjhl", teamKind: "chl" },
@@ -46,7 +49,10 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   ushl: { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }, // green
   // NB green was previously reserved for a future Euro group; USHL took it. Pick a new hue for Euro.
 };
-const leagueKey = (id: LeagueId): string => (id === 'ohl' || id === 'whl' || id === 'qmjhl' ? 'chl' : id);
+// The ECHL shares the AHL's colour, as on the web: what the colour encodes is the tier, and both are
+// North American minor pro. Two near-identical hues would imply a distinction that isn't there.
+const leagueKey = (id: LeagueId): string =>
+  id === 'ohl' || id === 'whl' || id === 'qmjhl' ? 'chl' : id === 'echl' ? 'ahl' : id;
 
 export function leagueColors(id: LeagueId, dark: boolean): { bg: string; card: string; pill: string } {
   const tint = LEAGUE_TINTS[leagueKey(id)] ?? LEAGUE_TINTS.nhl;
@@ -68,7 +74,7 @@ export const useLeague = () => useContext(LeagueContext);
 // every CHL game. The game id prefix is the dependable key — it's the same one the web app's
 // /games/{prefix}-{id} routes use. `path` is NOT a safe first choice: it holds the sub-league on CHL
 // feeds (["QMJHL"]) but the conference/division on NHL ones (["EAST","ATL","MET"]).
-const KNOWN_LEAGUES = new Set(["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"]);
+const KNOWN_LEAGUES = new Set(["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"]);
 
 export function gameLeague(g: ScoreGame): string {
   const prefix = (g.id ?? "").split("-")[0].toUpperCase();
@@ -145,6 +151,13 @@ export async function fetchGameDays(id: LeagueId, from: string, to: string): Pro
 export async function fetchStandings(id: LeagueId): Promise<StandingsTeam[]> {
   const cfg = leagueById(id);
   const raw = await api<{ teams?: any[] }>(cfg.standingsPath);
+  // ECHL team pages key on the club's echl.com slug, not the HockeyTech id the standings carry (five
+  // clubs have no discoverable id), so the tap-through id comes from the club registry, joined on code.
+  const echlSlugByCode = new Map<string, string>();
+  if (cfg.teamKind === "echl") {
+    const reg = await api<{ teams?: { code?: string; slug?: string }[] }>("/echl-teams").catch(() => ({ teams: [] }));
+    for (const t of reg.teams ?? []) if (t.code && t.slug) echlSlugByCode.set(t.code.toUpperCase(), t.slug);
+  }
   return (raw.teams ?? []).map((r) => ({
     name: r.name,
     abbr: r.abbr,
@@ -159,6 +172,7 @@ export async function fetchStandings(id: LeagueId): Promise<StandingsTeam[]> {
     clinch: r.clinch ?? undefined,
     routeId:
       cfg.teamKind === "ahl" ? `ahl-${r.teamId}`
+      : cfg.teamKind === "echl" ? `echl-${echlSlugByCode.get(String(r.abbr ?? "").toUpperCase()) ?? String(r.abbr ?? "").toLowerCase()}`
       : cfg.teamKind === "chl" ? `chl-${cfg.id}-${r.teamId}`
       : cfg.teamKind === "ushl" ? `ushl-${r.teamId}`
       : String(r.abbr ?? "").toLowerCase(),
@@ -227,8 +241,8 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 // USHL is last in BOTH — despite being a US league, Canadian junior is followed more in the US than
 // the USHL is. Region detection is best-effort — see ./region.
 const LEAGUE_ORDER: Record<Region, readonly string[]> = {
-  US: ["NHL", "AHL", "NCAA", "OHL", "WHL", "QMJHL", "USHL"],
-  INTL: ["NHL", "AHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"],
+  US: ["NHL", "AHL", "ECHL", "NCAA", "OHL", "WHL", "QMJHL", "USHL"],
+  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"],
 };
 
 // Section order for the Home hub, by the device's region.
@@ -256,6 +270,31 @@ export function compareNcaaConferences(a: string, b: string): number {
   const aLast = a === NCAA_INDEPENDENTS ? 1 : 0;
   const bLast = b === NCAA_INDEPENDENTS ? 1 : 0;
   return aLast - bLast || a.localeCompare(b);
+}
+
+/**
+ * NCAA scoreboard groups: a game is filed under a conference only when both sides are in it; anything
+ * else — two conferences meeting, an Independent on either side, an unknown side — is Non-Conference
+ * (the API stamps `game.conference`). Order: conferences alphabetical, Non-Conference last. Mirrors
+ * lib/ncaa-conferences.ts in the web repo.
+ */
+export const NCAA_NON_CONFERENCE = 'Non-Conference';
+
+export function compareNcaaGroups(a: string, b: string): number {
+  const aLast = a === NCAA_NON_CONFERENCE ? 1 : 0;
+  const bLast = b === NCAA_NON_CONFERENCE ? 1 : 0;
+  return aLast - bLast || compareNcaaConferences(a, b);
+}
+
+/** Split an NCAA slate into [group, games] pairs in display order. Unstamped games go to Non-Conference. */
+export function groupNcaaByConference(games: ScoreGame[]): [string, ScoreGame[]][] {
+  const by = new Map<string, ScoreGame[]>();
+  for (const g of games) {
+    const k = g.conference ?? NCAA_NON_CONFERENCE;
+    if (!by.has(k)) by.set(k, []);
+    by.get(k)!.push(g);
+  }
+  return [...by.entries()].sort(([a], [b]) => compareNcaaGroups(a, b));
 }
 
 // NHL divisions in conference order (Eastern, then Western) rather than alphabetically, matching the
@@ -297,16 +336,20 @@ export function orderedLeagues(region: Region = detectRegion()): LeagueConfig[] 
   );
 }
 
-// Aggregate today's scores across every league into one { games, teamsById } for the Home hub.
+// Aggregate one day's scores across every league into one { games, teamsById } for the Home hub.
 // Each league endpoint is independent — a failure in one doesn't sink the rest.
-export async function fetchAllScores(): Promise<{
+//
+// The date is always sent. Without it the NHL feed rolls forward to the next slate that has games,
+// which put September 29 cards under an "NHL" header with no date on a September 8 Home. Home wants
+// TODAY, and decides for itself what to show when today is dark (see lib/home.ts fetchLookahead).
+export async function fetchAllScores(date: string): Promise<{
   games: ScoreGame[];
   teamsById: Record<string, ScoreTeam>;
 }> {
   const empty = () => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> });
-  const paths = ["/scores", "/ahl-scores", "/chl-scores", "/ushl-scores", "/ncaa-scores"];
+  const paths = ["/scores", "/ahl-scores", "/echl-scores", "/chl-scores", "/ushl-scores", "/ncaa-scores"];
 
-  const live = await Promise.all(paths.map((p) => api<ScoresResponse>(p).catch(empty)));
+  const live = await Promise.all(paths.map((p) => api<ScoresResponse>(`${p}?date=${date}`).catch(empty)));
   const games = live.flatMap((r) => r.games ?? []);
   const teamsById: Record<string, ScoreTeam> = Object.assign({}, ...live.map((r) => r.teamsById ?? {}));
   return { games, teamsById };

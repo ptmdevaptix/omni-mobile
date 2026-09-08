@@ -37,6 +37,7 @@ function GameRow({ g }: { g: ScheduleGame }) {
       <TeamLogo uri={g.opponentLogo} size={22} />
       <Text style={{ flex: 1, color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{g.opponentAbbr}</Text>
       {g.postseason ? <Text style={{ color: t.subtle, fontSize: 10, marginRight: 6 }} numberOfLines={1}>{g.postseason}</Text> : null}
+      {g.preseason ? <Text style={{ color: t.subtle, fontSize: 10, fontWeight: '800', marginRight: 6 }}>PRE</Text> : null}
       {g.state === 'FINAL' ? (
         <View style={styles.result}>
           <Text style={{ color: resultColor, fontSize: 14, fontWeight: '800' }}>{g.result ?? ''}</Text>

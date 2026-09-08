@@ -24,6 +24,9 @@ export type ScoreGame = {
   startTimeUTC?: string; // ISO puck drop — the reliable way to date a game (statusLabel is time-only)
   gameDate?: string;     // YYYY-MM-DD — feeds that know the day but not the time (seeded NCAA schedules)
   preseason?: boolean; // HockeyTech career=0 seasons (exhibition/pre-season)
+  // NCAA only: the conference both sides share, or "Non-Conference" (different conferences, an
+  // Independent on either side, or an unknown side). Stamped by the API so both clients group alike.
+  conference?: string;
 };
 
 // NHL /scores enriches teams with location + nickname (there is no single `name` field here, unlike

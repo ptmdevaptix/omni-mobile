@@ -39,6 +39,7 @@ export type ScheduleGame = {
   teamScore?: number;
   opponentScore?: number;
   result?: 'W' | 'L' | 'OTL';
+  preseason?: boolean; // exhibition — PRE tag, not part of the record
   overtime?: 'OT' | 'SO';
   state: 'FINAL' | 'UPCOMING' | 'POSTPONED';
   broadcasts?: string[];
