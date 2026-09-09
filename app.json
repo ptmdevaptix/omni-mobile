@@ -4,6 +4,12 @@
     "slug": "omni-hockey",
     "version": "0.1.0",
     "orientation": "default",
+    "updates": {
+      "url": "https://u.expo.dev/9d880ab1-8a1e-4a83-a5d6-64e7c10749bb"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "icon": "./assets/images/icon.png",
     "scheme": "omnihockey",
     "userInterfaceStyle": "automatic",
