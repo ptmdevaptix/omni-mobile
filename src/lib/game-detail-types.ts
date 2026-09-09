@@ -20,6 +20,7 @@ export type ThreeStar = { star: number; name: string; teamAbbr: string; goals: n
 export type BoxSkater = {
   playerId: number; name: string; number?: number;
   goals?: number; assists?: number; plusMinus?: number; pim?: number; toi?: string;
+  sog?: number; // shots on goal — CHL feeds only today, so the column is conditional
 };
 export type BoxGoalie = {
   playerId: number; name: string; number?: number;

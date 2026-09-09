@@ -30,6 +30,8 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
   const nhl = (g.league || '').toUpperCase() === 'NHL';
   const box = side === 'away' ? rosters.away : rosters.home;
   const hasToi = [...box.forwards, ...box.defense].some((p) => p.toi);
+  // Only the CHL feeds carry per-skater shots today — elsewhere the column would be all dashes.
+  const hasSog = [...box.forwards, ...box.defense].some((p) => p.sog != null);
   const sortFn = hasToi ? byToi : byPts;
   const groups = [
     { label: 'Forwards', players: [...box.forwards].sort(sortFn) },
@@ -58,6 +60,7 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
           <Text style={[styles.hname, { color: t.sub }]}>Player</Text>
           <Text style={[styles.c, { color: t.sub }]}>G</Text>
           <Text style={[styles.c, { color: t.sub }]}>A</Text>
+          {hasSog ? <Text style={[styles.c, { color: t.sub }]}>SOG</Text> : null}
           <Text style={[styles.c, { color: t.sub }]}>+/-</Text>
           <Text style={[styles.c, { color: t.sub }]}>PIM</Text>
           {hasToi ? <Text style={[styles.toi, { color: t.sub }]}>TOI</Text> : null}
@@ -71,6 +74,7 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
                 <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{fitName(p.name)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.goals)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.assists)}</Text>
+                {hasSog ? <Text style={[styles.c, { color: t.text }]}>{fmt(p.sog)}</Text> : null}
                 <Text style={[styles.c, { color: t.sub }]}>{fmtPM(p.plusMinus)}</Text>
                 <Text style={[styles.c, { color: t.sub }]}>{fmt(p.pim)}</Text>
                 {hasToi ? <Text style={[styles.toi, { color: t.sub }]}>{p.toi ?? '—'}</Text> : null}
