@@ -27,6 +27,12 @@ export type ContractSeason = { startYear: number; capHit: number; clause?: strin
 
 export type PlayerContract = {
   status: 'signed' | 'ufa' | 'rfa';
+  /**
+   * An entry-level deal — the one contract whose dates are not settled. It SLIDES a year forward if
+   * the player is 18 or 19 and does not reach ten NHL games, so the seasons drawn from it are a plan
+   * rather than a commitment.
+   */
+  entryLevel?: boolean;
   capHitLabel?: string; termYears?: number; expiryYear?: number; expiryStatus?: 'UFA' | 'RFA'; source?: string;
   sourceUrl?: string;
   /** Average annual value in dollars, for the seasons a per-season figure is missing. */

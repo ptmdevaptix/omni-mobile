@@ -226,13 +226,21 @@ function ContractCard({ p }: { p: PlayerDetail }) {
 
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-      <Text style={[styles.section, { color: t.sub }]}>CONTRACT</Text>
+      {/* The heading carries it, because an entry-level deal changes what every box below means. */}
+      <Text style={[styles.section, { color: t.sub }]}>{c.entryLevel ? 'CONTRACT (ENTRY LEVEL)' : 'CONTRACT'}</Text>
       {timeline ? (
         <ContractTimeline contract={c} />
       ) : (
         // Signed, and we could not read the term. A sentence is all there is to say.
         <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>{contractSummary(c)}</Text>
       )}
+      {/* Why the heading matters. There is no hover on a phone to hide this behind, and an ELC's
+          dates are the one thing on this card that can move without anyone signing anything. */}
+      {c.entryLevel ? (
+        <Text style={{ color: t.sub, fontSize: 11, lineHeight: 15, marginTop: 8 }}>
+          Slides a year forward if he plays fewer than 10 NHL games at 18 or 19.
+        </Text>
+      ) : null}
       <Text style={{ color: t.subtle, fontSize: 10, marginTop: 10 }}>Contract data via {c.source ?? 'cap-space.com'}</Text>
     </View>
   );
