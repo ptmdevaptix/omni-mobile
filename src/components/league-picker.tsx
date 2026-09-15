@@ -121,8 +121,12 @@ export function LeaguePicker({ value, onChange }: { value?: PickerId; onChange?:
 }
 
 const styles = StyleSheet.create({
-  row: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' },
+  // No alignment props here. A horizontal ScrollView takes its scrollable width from this container,
+  // and alignItems/justifyContent on it can leave the content measured at the viewport width — the row
+  // then renders correctly, scrolls under scrollTo(), and refuses to pan by hand. Children stretch to
+  // the row height by default, which is what the divider wants anyway.
+  row: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   member: { paddingHorizontal: 8, paddingVertical: 7 },
-  divider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginVertical: 6, marginHorizontal: 2 },
+  divider: { width: StyleSheet.hairlineWidth, marginVertical: 6, marginHorizontal: 2 },
 });
