@@ -46,6 +46,8 @@ export type PlayerDetail = {
   height?: string; weight?: number; shootsCatches?: string;
   birthDate?: string; age?: number; birthplace?: string; birthCountry?: string;
   draft?: PlayerDraft;
+  /** False when nobody has told us whether he was drafted — not the same as "undrafted". */
+  draftStatusKnown?: boolean;
   currentSeason?: PlayerStatLine;
   careerTotals?: PlayerStatLine;
   seasonTotals: PlayerSeasonStatRow[];

@@ -46,8 +46,22 @@ function Hero({ p }: { p: PlayerDetail }) {
       {p.headshot ? <Image source={{ uri: p.headshot }} style={styles.headshot} contentFit="cover" /> : <View style={[styles.headshot, { backgroundColor: t.card }]} />}
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 22, fontWeight: '800' }} numberOfLines={1}>{p.fullName}</Text>
-        <Text style={{ color: t.sub, fontSize: 14, marginTop: 2 }}>
-          {[p.number != null ? `#${p.number}` : null, p.position].filter(Boolean).join(' · ')}
+        {/* Number, position and the physicals as ONE line.
+            Height, weight and handedness are two or three characters each; as three labelled rows in
+            the card below they spent a full width apiece saying very little — "R" on its own beside
+            "Shoots" reads as a rendering fault rather than a fact. They belong with the number and
+            the position, which is the line a reader takes in as one anyway.
+            Two lines allowed: it fits on one phone-width line for most players, and a long club or a
+            goalie's "Catches" wraps rather than truncating — a clipped "Shoo…" would be worse than a
+            second line. Built from what is known, so a junior with no listed weight gets no gap. */}
+        <Text style={{ color: t.sub, fontSize: 14, marginTop: 2, lineHeight: 19 }} numberOfLines={2}>
+          {[
+            p.number != null ? `#${p.number}` : null,
+            p.position,
+            p.height || null,
+            p.weight != null ? `${p.weight} lb` : null,
+            p.shootsCatches ? `${p.isGoalie ? 'Catches' : 'Shoots'}: ${p.shootsCatches}` : null,
+          ].filter(Boolean).join(' · ')}
         </Text>
         {p.teamAbbrev ? (
           <Link href={{ pathname: '/teams/[teamId]', params: { teamId: p.teamAbbrev.toLowerCase() } }} asChild>
@@ -113,15 +127,31 @@ function contractSummary(c: PlayerContract): string {
   return [c.capHitLabel ? `${c.capHitLabel}/yr` : '', term].filter(Boolean).join(' · ');
 }
 
+// "1998-10-30" → "Oct 30, 1998". Parsed at noon so a negative UTC offset cannot roll the date back
+// a day — a birthday is a calendar fact, not an instant.
+function fmtBirthDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T12:00:00`);
+  return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function BioCard({ p }: { p: PlayerDetail }) {
   const t = useTheme();
   const timeline = p.contract ? contractTimeline(p.contract) : null;
-  const born = [p.birthDate, p.age != null ? `(${p.age})` : null].filter(Boolean).join(' ');
-  const draft = p.draft?.year ? `${p.draft.year}${p.draft.teamAbbrev ? ` · ${p.draft.teamAbbrev}` : ''}${p.draft.overallPick ? ` · #${p.draft.overallPick}` : ''}` : 'Undrafted';
+  const born = [fmtBirthDate(p.birthDate), p.age != null ? `(${p.age})` : null].filter(Boolean).join(' ');
+  const draftLabel = p.draft?.year
+    ? `${p.draft.year}${p.draft.teamAbbrev ? ` · ${p.draft.teamAbbrev}` : ''}${p.draft.overallPick ? ` · #${p.draft.overallPick}` : ''}`
+    : null;
+  /**
+   * "Undrafted" only when we actually know he went undrafted.
+   *
+   * The NHL publishes draft status for players in its own system; for a junior we have never seen
+   * there, the absence of a draft record says nothing about him. A row reading "Draft — Undrafted"
+   * is worse than no row, because a reader takes it as an assertion about the PLAYER rather than
+   * about our data — and on a junior roster nearly everyone is in that state.
+   */
+  const draft = draftLabel ?? (p.draftStatusKnown === false ? undefined : 'Undrafted');
   const rows: [string, string | undefined][] = [
-    ['Height', p.height],
-    ['Weight', p.weight ? `${p.weight} lb` : undefined],
-    [p.isGoalie ? 'Catches' : 'Shoots', p.shootsCatches],
     ['Born', born || undefined],
     // birthplace already ends in the country ("Calgary, AB, CAN"), so appending birthCountry gave
     // "Calgary, AB, CAN, CAN". The country alone is the fallback for players we have no city for.
@@ -142,10 +172,15 @@ function BioCard({ p }: { p: PlayerDetail }) {
             : contractStatusLabel(p.contract)] as [string, string]]
       : []),
   ];
+  const shown = rows.filter(([, v]) => v);
+  // A heading over nothing looks broken. For a junior we hold nothing but a name and a position —
+  // no birth date, no birthplace, and now no "Undrafted" to pad it — there is no card to draw.
+  if (!shown.length && !p.contract) return null;
+
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
       <Text style={[styles.section, { color: t.sub }]}>PLAYER INFO</Text>
-      {rows.filter(([, v]) => v).map(([label, val]) => (
+      {shown.map(([label, val]) => (
         <View key={label} style={styles.bioRow}>
           <Text style={{ color: t.sub, fontSize: 14 }}>{label}</Text>
           <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>{val}</Text>
