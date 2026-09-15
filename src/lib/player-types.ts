@@ -52,7 +52,15 @@ export type PlayerDetail = {
   firstName: string; lastName: string; fullName: string;
   position: string; isGoalie: boolean; number?: number; isActive?: boolean;
   headshot?: string;
+  // The club he PLAYS for, which for a prospect is not the club holding his rights.
   teamAbbrev?: string; teamName?: string; teamLogo?: string;
+  /** The club's page. A non-NHL club's URL is not derivable from its abbreviation. */
+  teamHref?: string;
+  /**
+   * The NHL club that HOLDS him — drafted, signed or traded for — which is not who he plays for. A
+   * drafted junior has both, and they are rarely the same team.
+   */
+  nhlTeam?: string;
   height?: string; weight?: number; shootsCatches?: string;
   birthDate?: string; age?: number; birthplace?: string; birthCountry?: string;
   draft?: PlayerDraft;

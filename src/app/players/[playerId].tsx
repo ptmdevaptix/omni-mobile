@@ -43,6 +43,7 @@ function Hero({ p }: { p: PlayerDetail }) {
   const t = useTheme();
   const { isFavoritePlayer, togglePlayer } = useFavorites();
   const on = isFavoritePlayer(p.id);
+  const teamId = p.teamHref?.startsWith('/teams/') ? p.teamHref.slice('/teams/'.length) : undefined;
   return (
     <View style={styles.hero}>
       {p.headshot ? <Image source={{ uri: p.headshot }} style={styles.headshot} contentFit="cover" /> : <View style={[styles.headshot, { backgroundColor: t.card }]} />}
@@ -65,13 +66,23 @@ function Hero({ p }: { p: PlayerDetail }) {
             p.shootsCatches ? `${p.isGoalie ? 'Catches' : 'Shoots'}: ${p.shootsCatches}` : null,
           ].filter(Boolean).join(' · ')}
         </Text>
-        {p.teamAbbrev ? (
-          <Link href={{ pathname: '/teams/[teamId]', params: { teamId: p.teamAbbrev.toLowerCase() } }} asChild>
-            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+        {/* The club he PLAYS for. `teamHref` rather than a path built from the abbreviation: the
+            Marlies' abbreviation is TOR, and /teams/tor is the Maple Leafs. A club we do not carry —
+            an SHL side, say — is named without a link rather than pointed at a page that isn't. */}
+        {p.teamName ? (
+          teamId ? (
+            <Link href={{ pathname: '/teams/[teamId]', params: { teamId } }} asChild>
+              <Pressable style={styles.clubRow}>
+                <TeamLogo uri={p.teamLogo} size={20} />
+                <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>{p.teamName}</Text>
+              </Pressable>
+            </Link>
+          ) : (
+            <View style={styles.clubRow}>
               <TeamLogo uri={p.teamLogo} size={20} />
-              <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>{p.teamName || p.teamAbbrev}</Text>
-            </Pressable>
-          </Link>
+              <Text style={{ color: t.sub, fontSize: 14, fontWeight: '600' }}>{p.teamName}</Text>
+            </View>
+          )
         ) : null}
       </View>
       <Pressable onPress={() => togglePlayer(p.id)} hitSlop={10} accessibilityLabel={on ? 'Remove favorite' : 'Add favorite'}>
@@ -173,6 +184,18 @@ function BioCard({ p }: { p: PlayerDetail }) {
     // "Calgary, AB, CAN, CAN". The country alone is the fallback for players we have no city for.
     ['Birthplace', p.birthplace || p.birthCountry || undefined],
     ['Draft', draft],
+    /**
+     * Who HOLDS him, when that is not who he plays for.
+     *
+     * The club under his name is now the one he actually plays for, which for a prospect is his
+     * college or junior team — so the NHL club that drafted or signed him would otherwise vanish from
+     * the page entirely. Shown only when the two differ: for an NHL player it would repeat the line
+     * above it. (The web puts this as a crest beside the name; a labelled row is the version that
+     * needs no decoding.)
+     */
+    ...(p.nhlTeam && p.nhlTeam !== p.teamAbbrev
+      ? [['NHL rights', p.nhlTeam] as [string, string]]
+      : []),
     /**
      * Only a FREE AGENT's status belongs here.
      *
@@ -389,6 +412,7 @@ function StatCells({ line, goalie, bold }: { line: PlayerStatLine; goalie: boole
 
 const styles = StyleSheet.create({
   hero: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  clubRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   headshot: { width: 76, height: 76, borderRadius: 38 },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 2 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 8 },
