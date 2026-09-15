@@ -41,4 +41,27 @@ export type PlayerDetail = {
   error?: string;
 };
 
-export type PlayerSearchResult = { id: string; name: string; pos: string; teamAbbrev?: string; active?: boolean };
+/**
+ * One hit from /api/search/players, which searches OUR players table — not the NHL's endpoint — so
+ * juniors and college players are reachable by name too.
+ *
+ * Keyed by SLUG, the canonical player page. There is no numeric id here any more: the search stopped
+ * being NHL-only, and most of the players it can find have never had one.
+ *
+ * The list arrives RANKED (relevance, then league tier, then whether he is playing, then career
+ * games, then age) and capped at eight. Re-sorting it on this side throws that away — an earlier
+ * version sorted by `active` and undid the whole ordering.
+ */
+export type PlayerSearchResult = {
+  slug: string;
+  name: string;
+  pos: string;
+  /** Sweater number from his most recent roster, when a feed has recorded one. */
+  number?: number;
+  /** NHL club abbreviation when we know one, for the row's crest. Empty for most juniors. */
+  teamAbbrev?: string;
+  headshot?: string;
+  active?: boolean | null;
+  /** The league he is best associated with — "NHL", "OHL" — and what the ranking sorted on. */
+  league?: string | null;
+};

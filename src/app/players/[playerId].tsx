@@ -93,7 +93,9 @@ function BioCard({ p }: { p: PlayerDetail }) {
     ['Weight', p.weight ? `${p.weight} lb` : undefined],
     [p.isGoalie ? 'Catches' : 'Shoots', p.shootsCatches],
     ['Born', born || undefined],
-    ['Birthplace', [p.birthplace, p.birthCountry].filter(Boolean).join(', ') || undefined],
+    // birthplace already ends in the country ("Calgary, AB, CAN"), so appending birthCountry gave
+    // "Calgary, AB, CAN, CAN". The country alone is the fallback for players we have no city for.
+    ['Birthplace', p.birthplace || p.birthCountry || undefined],
     ['Draft', draft],
     ...(p.contract?.capHitLabel ? [['Contract', `${p.contract.capHitLabel}${p.contract.expiryYear ? ` → ${p.contract.expiryYear}` : ''}`] as [string, string]] : []),
   ];

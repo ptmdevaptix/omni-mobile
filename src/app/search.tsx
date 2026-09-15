@@ -28,11 +28,18 @@ export default function SearchScreen() {
     return (teamsQ.data ?? []).filter((tm) => tm.name.toLowerCase().includes(l) || (tm.abbr ?? '').toLowerCase().includes(l)).slice(0, 40);
   }, [s, teamsQ.data]);
 
-  const players = useMemo(() => [...(playersQ.data ?? [])].sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0)).slice(0, 40), [playersQ.data]);
+  // Straight through, in the order the API returned. It ranks by relevance, then league tier, then
+  // whether he is playing, then career games — sorting again here by `active` alone flattened all of
+  // that, which is how Makar ended up below players nobody was looking for.
+  const players = playersQ.data ?? [];
 
+  // Tagged rather than sniffed by field: both a team and a player carry `league` now, so the old
+  // `'league' in item` test filed every player as a team — no crest, and a tap that opened a team
+  // page with an undefined id.
+  type Hit = { kind: 'team'; team: TeamDirectoryEntry } | { kind: 'player'; player: PlayerSearchResult };
   const sections = [
-    ...(teams.length ? [{ title: 'Teams', data: teams as (TeamDirectoryEntry | PlayerSearchResult)[] }] : []),
-    ...(players.length ? [{ title: 'Players', data: players as (TeamDirectoryEntry | PlayerSearchResult)[] }] : []),
+    ...(teams.length ? [{ title: 'Teams', data: teams.map((team): Hit => ({ kind: 'team', team })) }] : []),
+    ...(players.length ? [{ title: 'Players', data: players.map((player): Hit => ({ kind: 'player', player })) }] : []),
   ];
 
   const noResults = s.length > 0 && !teams.length && !players.length && !playersQ.isFetching;
@@ -66,13 +73,13 @@ export default function SearchScreen() {
       ) : (
         <SectionList
           sections={sections}
-          keyExtractor={(item, i) => ('league' in item ? `t-${item.id}` : `p-${item.id}`) + i}
+          keyExtractor={(item, i) => (item.kind === 'team' ? `t-${item.team.id}` : `p-${item.player.slug}`) + i}
           contentContainerStyle={{ padding: 12, gap: 8 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => <Text style={[styles.header, { color: t.sub }]}>{section.title.toUpperCase()}</Text>}
-          renderItem={({ item }) => ('league' in item ? <TeamResult team={item} /> : <PlayerResult player={item} />)}
+          renderItem={({ item }) => (item.kind === 'team' ? <TeamResult team={item.team} /> : <PlayerResult player={item.player} />)}
         />
       )}
     </View>
@@ -105,19 +112,54 @@ function TeamResult({ team }: { team: TeamDirectoryEntry }) {
   );
 }
 
+/**
+ * The club crest, the same mark the team results two rows above use.
+ *
+ * A headshot loses to a crest at this size: every one is a head, centred, cropped identically, in a
+ * jersey too small to read, so six of them tell you nothing while six crests tell you at a glance who
+ * each player belongs to. The API sends `headshot: ""` for exactly that reason.
+ *
+ * No club but an NHL player gets the league's own shield: an unsigned free agent belongs to nobody,
+ * and initials read as "we have no idea who this is" where the shield says "NHL, no club" — the fact
+ * that changes the day he signs. NHL tier only; a junior wearing an NHL shield would be claiming
+ * something untrue, so he gets his initials.
+ */
+function PlayerCrest({ name, teamAbbrev, league, size = 30 }: { name: string; teamAbbrev?: string; league?: string | null; size?: number }) {
+  const t = useTheme();
+  const abbr = (teamAbbrev || (league === 'NHL' ? 'NHL' : '')).trim().toUpperCase();
+  if (abbr) {
+    const svg = (variant: string) => `https://assets.nhle.com/logos/nhl/svg/${abbr}_${variant}.svg`;
+    return <TeamLogo uri={svg('light')} darkUri={svg('dark')} size={size} />;
+  }
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const initials = ((words[0]?.[0] ?? '') + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase() || '?';
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: t.bg }]}>
+      <Text style={{ color: t.sub, fontSize: 12, fontWeight: '800' }}>{initials}</Text>
+    </View>
+  );
+}
+
 function PlayerResult({ player }: { player: PlayerSearchResult }) {
   const t = useTheme();
   const { isFavoritePlayer, togglePlayer } = useFavorites();
-  const pid = `nhl-${player.id}`;
+  // The slug IS the player page — /api/player resolves it directly, no nhl- prefix to rebuild.
+  const pid = player.slug;
+  const qualifier = [player.pos || null, player.number != null ? `#${player.number}` : null].filter(Boolean).join(' · ');
   return (
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
       <Link href={{ pathname: '/players/[playerId]', params: { playerId: pid } }} asChild>
         <Pressable style={styles.main}>
-          <View style={[styles.avatar, { backgroundColor: t.bg }]}>
-            <SymbolView name="person.fill" tintColor={t.subtle} size={16} />
-          </View>
-          <Text style={{ flex: 1, color: t.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{player.name}</Text>
-          <Text style={{ color: t.sub, fontSize: 12, fontWeight: '700' }}>{[player.pos, player.teamAbbrev].filter(Boolean).join(' · ')}</Text>
+          <PlayerCrest name={player.name} teamAbbrev={player.teamAbbrev} league={player.league} />
+          {/* Position and number sit against the name because they qualify IT — this is what tells
+              one Jack Smith from another when the names and the crests both match. The name shrinks
+              first: a clipped surname is still recognisable, half a number is not. */}
+          <Text style={{ flexShrink: 1, color: t.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{player.name}</Text>
+          {qualifier ? <Text style={{ color: t.sub, fontSize: 12 }}>{qualifier}</Text> : null}
+          <View style={{ flex: 1 }} />
+          {/* The league, not the club: it is what the ranking sorted on, so showing it is what makes
+              the order look deliberate rather than arbitrary. */}
+          {player.league ? <Text style={{ color: t.sub, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 }}>{player.league.toUpperCase()}</Text> : null}
         </Pressable>
       </Link>
       <StarButton on={isFavoritePlayer(pid)} onPress={() => togglePlayer(pid)} />
