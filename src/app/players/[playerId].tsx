@@ -4,11 +4,12 @@ import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ContractTimeline, contractTimeline } from '@/components/contract-timeline';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
 import { fetchPlayer, seasonLabel } from '@/lib/player';
-import type { PlayerDetail, PlayerSeasonStatRow, PlayerStatLine } from '@/lib/player-types';
+import type { PlayerContract, PlayerDetail, PlayerSeasonStatRow, PlayerStatLine } from '@/lib/player-types';
 import { useTheme } from '@/lib/theme';
 
 export default function PlayerScreen() {
@@ -84,8 +85,37 @@ function SeasonCard({ title, line, goalie }: { title: string; line: PlayerStatLi
   );
 }
 
+/**
+ * "Free Agent (UFA)" said the same thing twice and abbreviated the half that carries the meaning:
+ * the difference between unrestricted and restricted is whether his old club can match an offer,
+ * which is the entire question about a player in this state.
+ *
+ * Anything cap-space writes that is not one of these two is shown verbatim — the field is not a
+ * closed set, and an unfamiliar status is worth showing as-is rather than flattening into whichever
+ * of the two it least resembles.
+ */
+const STATUS_WORDS: Record<string, string> = {
+  UFA: 'Unrestricted Free Agent',
+  RFA: 'Restricted Free Agent',
+};
+
+function contractStatusLabel(c: PlayerContract): string {
+  const raw = (c.expiryStatus ?? (c.status === 'rfa' ? 'RFA' : 'UFA')).toUpperCase();
+  return STATUS_WORDS[raw] ?? raw;
+}
+
+// Cap hit + term/expiry in one field, e.g. "$1.07M/yr · 2 yrs · RFA '29".
+function contractSummary(c: PlayerContract): string {
+  const yr = c.yearsRemaining;
+  const term = c.status !== 'signed'
+    ? contractStatusLabel(c)
+    : `${yr === 0 ? 'Final yr' : `${yr} yr${yr === 1 ? '' : 's'}`}${c.expiryStatus && c.expiryYear ? ` · ${c.expiryStatus} '${String(c.expiryYear).slice(2)}` : ''}`;
+  return [c.capHitLabel ? `${c.capHitLabel}/yr` : '', term].filter(Boolean).join(' · ');
+}
+
 function BioCard({ p }: { p: PlayerDetail }) {
   const t = useTheme();
+  const timeline = p.contract ? contractTimeline(p.contract) : null;
   const born = [p.birthDate, p.age != null ? `(${p.age})` : null].filter(Boolean).join(' ');
   const draft = p.draft?.year ? `${p.draft.year}${p.draft.teamAbbrev ? ` · ${p.draft.teamAbbrev}` : ''}${p.draft.overallPick ? ` · #${p.draft.overallPick}` : ''}` : 'Undrafted';
   const rows: [string, string | undefined][] = [
@@ -97,7 +127,20 @@ function BioCard({ p }: { p: PlayerDetail }) {
     // "Calgary, AB, CAN, CAN". The country alone is the fallback for players we have no city for.
     ['Birthplace', p.birthplace || p.birthCountry || undefined],
     ['Draft', draft],
-    ...(p.contract?.capHitLabel ? [['Contract', `${p.contract.capHitLabel}${p.contract.expiryYear ? ` → ${p.contract.expiryYear}` : ''}`] as [string, string]] : []),
+    /**
+     * No strip means no season still to be played, and that is the same fact whether cap-space has
+     * already moved him to free agency or still lists the deal that just ran out: what the row
+     * reports is his STATUS, not a contract.
+     *
+     * The one case held back is a signed deal with no expiry year — that is not an expired contract,
+     * it is a contract we failed to read, and calling him a free agent would invent the answer.
+     */
+    ...(p.contract && !timeline
+      ? [[p.contract.status === 'signed' && p.contract.expiryYear == null ? 'Contract' : 'Status',
+          p.contract.status === 'signed' && p.contract.expiryYear == null
+            ? contractSummary(p.contract)
+            : contractStatusLabel(p.contract)] as [string, string]]
+      : []),
   ];
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
@@ -108,6 +151,17 @@ function BioCard({ p }: { p: PlayerDetail }) {
           <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>{val}</Text>
         </View>
       ))}
+      {/* No "CONTRACT" label, unlike every field above it. A row of dollar figures under season
+          headings, closing on UFA, is already the only thing it could be — and a label would sit
+          directly above the season numbers, where it reads as a heading for them. */}
+      {p.contract && timeline ? (
+        <View style={{ marginTop: 10 }}>
+          <ContractTimeline contract={p.contract} />
+        </View>
+      ) : null}
+      {p.contract ? (
+        <Text style={{ color: t.subtle, fontSize: 10, marginTop: 10 }}>Contract data via {p.contract.source ?? 'cap-space.com'}</Text>
+      ) : null}
     </View>
   );
 }

@@ -18,9 +18,21 @@ export type PlayerSeasonStatRow = PlayerStatLine & {
 
 export type PlayerDraft = { year?: number; teamAbbrev?: string; round?: number; overallPick?: number };
 
+/** One season of a deal, as cap-space publishes it: its own cap hit, and its own clause. */
+export type ContractSeason = { startYear: number; capHit: number; clause?: string };
+
 export type PlayerContract = {
   status: 'signed' | 'ufa' | 'rfa';
   capHitLabel?: string; termYears?: number; expiryYear?: number; expiryStatus?: 'UFA' | 'RFA'; source?: string;
+  sourceUrl?: string;
+  /** Average annual value in dollars, for the seasons a per-season figure is missing. */
+  capHit?: number;
+  yearsRemaining?: number;
+  /**
+   * Per season, when the crawl could read the table. A commitment is not one number repeated: Makar
+   * is on $9M through 2026-27 and $20.4M for the eight years after that.
+   */
+  seasons?: ContractSeason[];
 };
 
 export type PlayerDetail = {
