@@ -11,7 +11,8 @@ import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
 import { dayKey, dayLabel, daysBetween } from '@/lib/format';
 import { favMatchIds, isFavGame } from '@/lib/home';
-import { fetchGameDays, fetchScores, groupNcaaByConference, hasLiveGame, leagueColors, LIVE_MAX_AGE_MS, useLeague, type PickerId } from '@/lib/leagues';
+import { fetchGameDays, fetchScores, groupNcaaByConference, hasLiveGame, leagueColors, leaguesIn, LIVE_MAX_AGE_MS, useLeague, type PickerId } from '@/lib/leagues';
+import { useFollowedLeagues } from '@/lib/followed-leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -39,13 +40,20 @@ function toRows(games: ScoreGame[], per: number): ScoreGame[][] {
 export default function ScoresScreen() {
   const t = useTheme();
   const { league } = useLeague();
+  const { followed } = useFollowedLeagues();
   const c = leagueColors(league, t.mode === 'dark');
   const { width } = useWindowDimensions();
   const today = dayKey();
 
+  // Which leagues this tab is actually showing. A block narrowed by what the reader follows is a
+  // different question than the block itself, so it has to be part of the cache key — and the slate
+  // list and the games below have to be asked the SAME question, or the pager lands on days the
+  // games are then filtered out of.
+  const scope = leaguesIn(league, followed).join(',');
+
   const daysQ = useQuery({
-    queryKey: ['game-days', league],
-    queryFn: () => fetchGameDays(league, offsetDay(-LOOKBACK_DAYS), offsetDay(LOOKAHEAD_DAYS)),
+    queryKey: ['game-days', league, scope],
+    queryFn: () => fetchGameDays(league, offsetDay(-LOOKBACK_DAYS), offsetDay(LOOKAHEAD_DAYS), followed),
     staleTime: 6 * 3600_000,
   });
 
@@ -152,10 +160,14 @@ function SlateHeader({
 function SlatePage({ league, date, width }: { league: PickerId; date?: string; width: number }) {
   const t = useTheme();
   const { compact } = useCompact();
+  const { followed } = useFollowedLeagues();
   const c = leagueColors(league, t.mode === 'dark');
+  // Same scope as the slate list above — a block shows the member leagues the reader follows, so the
+  // key has to say which, or switching what you follow serves the old set from cache.
+  const scope = leaguesIn(league, followed).join(',');
   const q = useQuery({
-    queryKey: ['scores', league, date ?? 'live'],
-    queryFn: () => fetchScores(league, date),
+    queryKey: ['scores', league, scope, date ?? 'live'],
+    queryFn: () => fetchScores(league, date, followed),
     refetchInterval: (query) => (hasLiveGame(query.state.data?.games) ? 10_000 : 30_000),
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',

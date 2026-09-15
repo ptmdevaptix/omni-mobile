@@ -180,14 +180,43 @@ export async function fetchScores(id: PickerId, date?: string, followed: readonl
 //
 // NCAA is not covered by the endpoint (no season-wide feed upstream); it answers { supported: false },
 // and the caller falls back to the single live-plus-pin view.
-export async function fetchGameDays(id: PickerId, from: string, to: string): Promise<string[]> {
-  const cfg = leagueById(isBlock(id) ? blockOf(id)!.members[0] : (id as LeagueId));
+export async function fetchGameDays(
+  id: PickerId,
+  from: string,
+  to: string,
+  followed: readonly string[] = [],
+): Promise<string[]> {
+  const block = isBlock(id) ? blockOf(id)! : undefined;
+  const members = leaguesIn(id, followed);
+  const cfg = leagueById(block ? block.members[0] : (id as LeagueId));
   const top = cfg.topCode ?? cfg.label;
-  // No `sub` for a block: every day any of its leagues plays is a day the block plays.
-  const qs = new URLSearchParams({ from, to, top, ...(!isBlock(id) && cfg.subCode ? { sub: cfg.subCode } : {}) });
-  const r = await api<{ days?: Record<string, number>; supported?: boolean }>(`/game-days?${qs.toString()}`);
-  if (r.supported === false) return [];
-  return Object.keys(r.days ?? {}).sort();
+
+  const ask = async (sub?: string): Promise<string[] | null> => {
+    const qs = new URLSearchParams({ from, to, top, ...(sub ? { sub } : {}) });
+    const r = await api<{ days?: Record<string, number>; supported?: boolean }>(`/game-days?${qs.toString()}`);
+    // NCAA has no season-wide feed upstream and answers { supported: false }; the caller falls back
+    // to the single live-plus-pin view. Not the same as a league with no games.
+    return r.supported === false ? null : Object.keys(r.days ?? {});
+  };
+
+  /**
+   * The slate list has to cover exactly the leagues the games are filtered to.
+   *
+   * A block with every member showing is one call with no `sub` — every day any of its leagues plays.
+   * A block NARROWED to what the reader follows is one call PER member, unioned here.
+   *
+   * Per member rather than one call naming them all, because `sub` takes a single league: an endpoint
+   * given "BCHL,AJHL" recognises neither and answers for the whole block. That is what left the pager
+   * on days when only the SJHL played, where the games were then filtered away to nothing — a CJRA tab
+   * with no games at all. Asking one league at a time is a question every deployment can answer, so
+   * this cannot drift out of step with the API again.
+   */
+  if (!block || members.length === block.members.length) {
+    return (await ask(!block && cfg.subCode ? cfg.subCode : undefined))?.sort() ?? [];
+  }
+
+  const lists = await Promise.all(members.map((m) => ask(leagueById(m).subCode)));
+  return [...new Set(lists.flatMap((l) => l ?? []))].sort();
 }
 
 // W-L-OTL standings (NHL/AHL/CHL), normalized to StandingsTeam with a tap-through routeId.
