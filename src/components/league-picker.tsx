@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useFollowedLeagues } from '@/lib/followed-leagues';
-import { blockOf, leagueColors, pickerRows, useLeague, type PickerId } from '@/lib/leagues';
+import { blockOf, leagueColors, pickerRows, useLeague, type BlockKey, type PickerId } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
 /**
@@ -15,8 +15,12 @@ import { useTheme } from '@/lib/theme';
  *     [NHL] [AHL] [ECHL] [NCAA] [CHL] [USHL] │ OHL  WHL  QMJHL
  *
  * The block stays selected while a member row is showing, because the block IS a selection — "all
- * the CHL" — not a disclosure state. Tapping a member narrows to it; tapping the block pill again
- * goes back to all of them.
+ * the CHL" — not a disclosure state. Tapping a member narrows to it; tapping the member you are on
+ * widens back to all of them.
+ *
+ * Tapping the block pill while already on the block puts the member row away without changing what
+ * you are watching: on a narrow screen those three extra pills are most of the row, and someone who
+ * wants the whole CHL has no use for them until they want to narrow again.
  *
  * The chevron on a block pill is the only hint that anything is behind it. Without it the pill looks
  * identical to NHL, and the three leagues inside are undiscoverable unless you happen to tap.
@@ -28,7 +32,13 @@ export function LeaguePicker({ value, onChange }: { value?: PickerId; onChange?:
   const { followed } = useFollowedLeagues();
   const league = value ?? ctx.league;
   const setLeague = onChange ?? ctx.setLeague;
-  const { top, members } = pickerRows(followed, league);
+  const { top, members: open } = pickerRows(followed, league);
+
+  // Which block the reader has put away. Held per block, and only honoured while that block is the
+  // one showing, so arriving at a different league never leaves a stale drawer shut.
+  const [collapsed, setCollapsed] = useState<BlockKey | null>(null);
+  const shut = !!collapsed && blockOf(league)?.key === collapsed;
+  const members = shut ? [] : open;
 
   // Opening a block puts its members at the END of a row that is already wider than the screen, so
   // without this the only feedback for tapping CHL is a chevron flipping direction. Scroll them into
@@ -60,9 +70,15 @@ export function LeaguePicker({ value, onChange }: { value?: PickerId; onChange?:
         return (
           <Pressable
             key={id}
-            onPress={() => setLeague(id)}
+            onPress={() => {
+              // Already on this block: the pill is a drawer handle. Otherwise it is what selects the
+              // block — including from one of its own members, where it means "all of them".
+              if (entry.kind === 'block' && league === entry.key) { setCollapsed(shut ? null : entry.key); return; }
+              setCollapsed(null);
+              setLeague(id);
+            }}
             accessibilityRole="button"
-            accessibilityState={{ selected: active, expanded: entry.kind === 'block' ? active : undefined }}
+            accessibilityState={{ selected: active, expanded: entry.kind === 'block' ? (active && !shut) : undefined }}
             accessibilityLabel={entry.kind === 'block' ? `${entry.label}, ${entry.members.length} leagues` : entry.label}
             style={[
               styles.pill,
@@ -72,7 +88,7 @@ export function LeaguePicker({ value, onChange }: { value?: PickerId; onChange?:
           >
             <Text style={{ color: active ? (dark ? '#0b0b0b' : '#ffffff') : t.sub, fontSize: 13, fontWeight: active ? '800' : '600' }}>
               {entry.label}
-              {entry.kind === 'block' ? <Text style={{ fontSize: 9 }}>{active ? '  ▾' : '  ▸'}</Text> : null}
+              {entry.kind === 'block' ? <Text style={{ fontSize: 9 }}>{active && !shut ? '  ▾' : '  ▸'}</Text> : null}
             </Text>
           </Pressable>
         );
@@ -89,7 +105,7 @@ export function LeaguePicker({ value, onChange }: { value?: PickerId; onChange?:
                 key={m.id}
                 // Tapping the member you are already on widens back to the whole block, matching the
                 // web — it is the only way back to "all of it" without hunting for the block pill.
-                onPress={() => setLeague(on ? block.key : m.id)}
+                onPress={() => { setCollapsed(null); setLeague(on ? block.key : m.id); }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 style={styles.member}
