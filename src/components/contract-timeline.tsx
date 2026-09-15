@@ -124,6 +124,38 @@ export function contractPlayedOut(contract: PlayerContract): boolean {
   return contract.expiryYear != null && contract.expiryYear <= currentSeasonStartYear();
 }
 
+/** Age on September 15 of the season under way — the date the CBA measures this against. */
+function ageOnSept15(birthDate: string, startYear = currentSeasonStartYear()): number | null {
+  const b = new Date(`${birthDate}T12:00:00`);
+  if (isNaN(b.getTime())) return null;
+  const ref = new Date(Date.UTC(startYear, 8, 15));
+  let age = ref.getUTCFullYear() - b.getUTCFullYear();
+  const m = ref.getUTCMonth() - b.getUTCMonth();
+  if (m < 0 || (m === 0 && ref.getUTCDate() < b.getUTCDate())) age -= 1;
+  return age;
+}
+
+/**
+ * Can this entry-level deal still slide?
+ *
+ * Sliding is not a property of ELCs in general. It applies to a player of 18 or 19 who does not reach
+ * TEN NHL games: his whole term shifts forward a year. Matthew Schaefer is on an entry-level contract
+ * at 19 with 82 games behind him, so telling a reader his dates might move is simply false.
+ *
+ * Both conditions are required, and both must be KNOWN — without a birth date or a games figure the
+ * card says nothing beyond "entry level". A claim about dates moving is worth making only when we can
+ * stand behind it.
+ *
+ * (Ten games is counted across the career rather than within the season. The two differ only for a
+ * player who played under ten in each of two seasons at 18 and 19, and the career figure is the one
+ * the payload carries.)
+ */
+export function canSlide(contract: PlayerContract, nhlGamesPlayed?: number, birthDate?: string): boolean {
+  if (!contract.entryLevel || !birthDate || nhlGamesPlayed == null) return false;
+  const age = ageOnSept15(birthDate);
+  return age != null && age < 20 && nhlGamesPlayed < 10;
+}
+
 /**
  * The boxes the strip would draw, or null when there is nothing to draw — a pending free agent with
  * no term, or a deal whose last season has already been played.

@@ -5,7 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ContractTimeline, contractPlayedOut, contractTimeline } from '@/components/contract-timeline';
+import { canSlide, ContractTimeline, contractPlayedOut, contractTimeline } from '@/components/contract-timeline';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
@@ -223,6 +223,8 @@ function ContractCard({ p }: { p: PlayerDetail }) {
   const c = p.contract;
   if (!c || isFreeAgent(c)) return null;
   const timeline = contractTimeline(c);
+  // Only for a player the rule can still reach — see canSlide.
+  const slides = canSlide(c, p.careerTotals?.gamesPlayed, p.birthDate);
 
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
@@ -236,9 +238,9 @@ function ContractCard({ p }: { p: PlayerDetail }) {
       )}
       {/* Why the heading matters. There is no hover on a phone to hide this behind, and an ELC's
           dates are the one thing on this card that can move without anyone signing anything. */}
-      {c.entryLevel ? (
+      {slides ? (
         <Text style={{ color: t.sub, fontSize: 11, lineHeight: 15, marginTop: 8 }}>
-          Slides a year forward if he plays fewer than 10 NHL games at 18 or 19.
+          Slides a year forward if he plays fewer than 10 NHL games this season.
         </Text>
       ) : null}
       <Text style={{ color: t.subtle, fontSize: 10, marginTop: 10 }}>Contract data via {c.source ?? 'cap-space.com'}</Text>
