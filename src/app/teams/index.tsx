@@ -3,9 +3,10 @@ import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { LeaguePicker } from '@/components/league-picker';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
-import { compareTeamGroups, fetchAllTeams, leagueById, leagueColors, visibleLeagues, type LeagueId, type TeamDirectoryEntry } from '@/lib/leagues';
+import { compareTeamGroups, fetchAllTeams, isBlock, leagueById, leagueColors, leaguesIn, type PickerId, type TeamDirectoryEntry } from '@/lib/leagues';
 import { useFollowedLeagues } from '@/lib/followed-leagues';
 import { useTheme } from '@/lib/theme';
 
@@ -14,12 +15,29 @@ import { useTheme } from '@/lib/theme';
 export default function TeamsBrowserScreen() {
   const t = useTheme();
   const dark = t.mode === 'dark';
-  const [league, setLeague] = useState<LeagueId>('nhl');
+  const [league, setLeague] = useState<PickerId>('nhl');
   const { followed } = useFollowedLeagues();
   const c = leagueColors(league, dark);
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
+  const members = useMemo(() => leaguesIn(league, followed), [league, followed]);
+
   const groups = useMemo(() => {
+    // A block holds several leagues, and their divisions mean nothing to each other — an "East" in
+    // the OHL is not an "East" in the WHL. So a block groups by LEAGUE, and a single league keeps
+    // grouping by division the way it always has.
+    if (isBlock(league)) {
+      return members
+        .map((id) => {
+          const label = leagueById(id).label;
+          return {
+            name: label,
+            teams: (q.data ?? []).filter((tm) => tm.league === label).sort((a, b) => a.name.localeCompare(b.name)),
+          };
+        })
+        .filter((g) => g.teams.length);
+    }
+
     const label = leagueById(league).label;
     const teams = (q.data ?? []).filter((tm) => tm.league === label);
     const byGroup = new Map<string, TeamDirectoryEntry[]>();
@@ -32,22 +50,13 @@ export default function TeamsBrowserScreen() {
       .map(([name, list]) => ({ name, teams: list.sort((a, b) => a.name.localeCompare(b.name)) }))
       // Per-league order: NHL divisions in conference sequence, NCAA with Independents last.
       .sort((a, b) => compareTeamGroups(league, a.name, b.name));
-  }, [q.data, league]);
+  }, [q.data, league, members]);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.pills}>
-        {visibleLeagues(followed, league).map((l) => {
-          const on = l.id === league;
-          const pill = leagueColors(l.id, dark).pill;
-          return (
-            <Pressable key={l.id} onPress={() => setLeague(l.id)}
-              style={[styles.pill, { borderColor: on ? pill : t.border, backgroundColor: on ? pill : t.card }]}>
-              <Text style={{ color: on ? (dark ? '#0b0b0b' : '#fff') : t.sub, fontSize: 13, fontWeight: on ? '800' : '600' }}>{l.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {/* Local selection: this screen sits outside the tabs, so it owns its own league rather than
+          moving the one the tabs share. */}
+      <LeaguePicker value={league} onChange={setLeague} />
 
       {q.isLoading ? (
         <StateView kind="loading" />
@@ -84,8 +93,6 @@ function TeamCard({ team, card }: { team: TeamDirectoryEntry; card: string }) {
 }
 
 const styles = StyleSheet.create({
-  pills: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   groupHeader: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4, marginTop: 12, marginBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
   card: { width: '48.5%', flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },

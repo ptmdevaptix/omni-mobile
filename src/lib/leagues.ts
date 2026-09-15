@@ -84,14 +84,14 @@ const leagueKey = (id: LeagueId): string =>
   : id === 'echl' ? 'ahl'
   : id;
 
-export function leagueColors(id: LeagueId, dark: boolean): { bg: string; card: string; pill: string } {
-  const tint = LEAGUE_TINTS[leagueKey(id)] ?? LEAGUE_TINTS.nhl;
+export function leagueColors(id: PickerId, dark: boolean): { bg: string; card: string; pill: string } {
+  const tint = LEAGUE_TINTS[isBlock(id) ? (id === 'CHL' ? 'chl' : 'cjra') : leagueKey(id as LeagueId)] ?? LEAGUE_TINTS.nhl;
   const i = dark ? 1 : 0;
   return { bg: tint.bg[i], card: tint.card[i], pill: tint.pill[i] };
 }
 
 // --- Shared selection (which league is active across the content tabs) -------
-export const LeagueContext = createContext<{ league: LeagueId; setLeague: (id: LeagueId) => void }>({
+export const LeagueContext = createContext<{ league: PickerId; setLeague: (id: PickerId) => void }>({
   league: "nhl",
   setLeague: () => {},
 });
@@ -156,8 +156,19 @@ const inLeague = (g: ScoreGame, code: string) => {
 
 // Scores for one league. `date` omitted = whatever the feed considers current (the NHL feed answers with
 // the next day that has games, rather than an empty today).
-export async function fetchScores(id: LeagueId, date?: string): Promise<ScoresResponse> {
-  const cfg = leagueById(id);
+export async function fetchScores(id: PickerId, date?: string, followed: readonly string[] = []): Promise<ScoresResponse> {
+  // A block's members share one endpoint, so "all of it" is that endpoint with no sub-filter — and
+  // when the reader follows only some of the block, it is filtered to those. Selecting CJRA while
+  // following two of the six should not hand back the other four.
+  if (isBlock(id)) {
+    const members = leaguesIn(id, followed);
+    const cfg = leagueById(members[0]);
+    const r = await api<ScoresResponse>(date ? `${cfg.scoresPath}?date=${date}` : cfg.scoresPath);
+    const codes = new Set(members.map((m) => leagueById(m).subCode!).filter(Boolean));
+    const all = blockOf(id)!.members.length === members.length;
+    return { ...r, games: all ? (r.games ?? []) : (r.games ?? []).filter((g) => [...codes].some((c) => inLeague(g, c))) };
+  }
+  const cfg = leagueById(id as LeagueId);
   const r = await api<ScoresResponse>(date ? `${cfg.scoresPath}?date=${date}` : cfg.scoresPath);
   const games = cfg.subCode ? (r.games ?? []).filter((g) => inLeague(g, cfg.subCode!)) : (r.games ?? []);
   return { ...r, games };
@@ -169,10 +180,11 @@ export async function fetchScores(id: LeagueId, date?: string): Promise<ScoresRe
 //
 // NCAA is not covered by the endpoint (no season-wide feed upstream); it answers { supported: false },
 // and the caller falls back to the single live-plus-pin view.
-export async function fetchGameDays(id: LeagueId, from: string, to: string): Promise<string[]> {
-  const cfg = leagueById(id);
+export async function fetchGameDays(id: PickerId, from: string, to: string): Promise<string[]> {
+  const cfg = leagueById(isBlock(id) ? blockOf(id)!.members[0] : (id as LeagueId));
   const top = cfg.topCode ?? cfg.label;
-  const qs = new URLSearchParams({ from, to, top, ...(cfg.subCode ? { sub: cfg.subCode } : {}) });
+  // No `sub` for a block: every day any of its leagues plays is a day the block plays.
+  const qs = new URLSearchParams({ from, to, top, ...(!isBlock(id) && cfg.subCode ? { sub: cfg.subCode } : {}) });
   const r = await api<{ days?: Record<string, number>; supported?: boolean }>(`/game-days?${qs.toString()}`);
   if (r.supported === false) return [];
   return Object.keys(r.days ?? {}).sort();
@@ -367,37 +379,118 @@ export function leagueFamily(label: string): string {
 }
 
 /**
- * Leagues the picker always offers, whatever the reader follows.
+ * Leagues that group under one pill.
  *
- * The ones a general hockey reader is assumed to want. Dropping one behind a setting would make the
- * app look like it had lost coverage. Mirrors ALWAYS_VISIBLE_LEAGUES in the web's lib/visible-leagues
- * — the web lists the CHL as a block, which here means its three member leagues.
+ * Mirrors LEAGUE_HIERARCHY in the web repo. The point is the top row: fourteen flat pills is a wall,
+ * and three of them are the CHL and six are Canadian Jr A — groupings a reader thinks of as one
+ * thing until they want a specific league. Collapsed, the default row is six pills instead of
+ * fourteen, which is what the web shows.
  */
-const ALWAYS_VISIBLE: readonly LeagueId[] = ['nhl', 'ahl', 'echl', 'ncaa', 'ushl', 'ohl', 'whl', 'qmjhl'];
+export type BlockKey = 'CHL' | 'CJRA';
 
 /**
- * Which leagues the picker offers.
+ * What the picker can have selected: a league, or a whole block.
  *
- * Fourteen pills is a wall, and the ones at the end are the ones fewest readers want — so a league
- * outside the core set appears once it is FOLLOWED, which is the same list that decides what Home
- * shows. Following two of the six Canadian Jr A leagues and still being shown all six makes the row
- * stop being the reader's leagues and go back to being a list of everything we carry.
- *
- * `current` survives regardless, so arriving on a league — a remembered selection, a tap through
- * from a team — never leaves you on a page whose own league is missing from the picker above it.
- *
- * Presentation only: every league's data and routes are untouched, and Scores still has every league
- * for anyone who follows it.
+ * A block is a real selection, not a disclosure state — "CHL" means all three leagues, the way it
+ * does on the web. Screens that can honour that do (Scores shows the combined slate); screens that
+ * cannot resolve it to a member and say so with their own chips (Standings has no all-CHL table).
  */
-export function visibleLeagues(
-  followed: readonly string[],
-  current?: LeagueId,
-  region: Region = detectRegion(),
-): LeagueConfig[] {
+export type PickerId = LeagueId | BlockKey;
+
+export type LeagueBlock = { key: BlockKey; label: string; members: readonly LeagueId[] };
+
+export const LEAGUE_BLOCKS: readonly LeagueBlock[] = [
+  { key: 'CHL', label: 'CHL', members: ['ohl', 'whl', 'qmjhl'] },
+  // Not "CJHL": the BCHL left that organisation in 2023, so the real acronym would be wrong for a
+  // grouping that includes it. Same name the web uses.
+  { key: 'CJRA', label: 'CJRA', members: ['bchl', 'ajhl', 'sjhl', 'mjhl', 'ojhl', 'cchl'] },
+];
+
+export const isBlock = (id: PickerId): id is BlockKey => id === 'CHL' || id === 'CJRA';
+
+export const blockOf = (id: PickerId): LeagueBlock | undefined =>
+  isBlock(id) ? LEAGUE_BLOCKS.find((b) => b.key === id)
+              : LEAGUE_BLOCKS.find((b) => b.members.includes(id as LeagueId));
+
+/**
+ * The concrete leagues a selection stands for — one for a league, all of them for a block.
+ * Everything that fetches uses this rather than branching on `isBlock` itself.
+ */
+export function leaguesIn(id: PickerId, followed: readonly string[] = []): LeagueId[] {
+  if (!isBlock(id)) return [id as LeagueId];
+  const block = blockOf(id)!;
   const follow = new Set(followed.map((l) => l.toUpperCase()));
-  return orderedLeagues(region).filter(
-    (l) => ALWAYS_VISIBLE.includes(l.id) || follow.has(l.label.toUpperCase()) || l.id === current,
-  );
+  const members = block.members.map((m) => leagueById(m));
+  const anyFollowed = members.some((m) => follow.has(m.label.toUpperCase()));
+  return (anyFollowed ? members.filter((m) => follow.has(m.label.toUpperCase())) : members).map((m) => m.id);
+}
+
+/**
+ * Top-level entries the picker always offers — six, matching ALWAYS_VISIBLE_LEAGUES on the web.
+ *
+ * What a general hockey reader is assumed to want. Hiding one behind a setting would make the app
+ * look like it had lost coverage. CHL counts as ONE of these; its members live behind it.
+ */
+const ALWAYS_VISIBLE: readonly string[] = ['nhl', 'ahl', 'echl', 'CHL', 'ncaa', 'ushl'];
+
+export type PickerEntry =
+  | { kind: 'league'; id: LeagueId; label: string }
+  | { kind: 'block'; key: BlockKey; label: string; members: LeagueConfig[] };
+
+/**
+ * Which of a block's members to offer beneath it.
+ *
+ * Following NONE of them means the block is simply a core league nobody has expressed a view about —
+ * the CHL, which everyone gets — so the full membership is the right default. Following SOME is a
+ * statement and is honoured exactly. The one being VIEWED always survives, so arriving on a league
+ * never leaves you on a row missing it.
+ */
+function visibleMembers(block: LeagueBlock, followed: ReadonlySet<string>, current?: LeagueId): LeagueConfig[] {
+  const all = block.members.map((id) => leagueById(id));
+  const anyFollowed = all.some((l) => followed.has(l.label.toUpperCase()));
+  if (!anyFollowed) return all;
+  return all.filter((l) => followed.has(l.label.toUpperCase()) || l.id === current);
+}
+
+/**
+ * The picker's two rows: the top-level entries, and the members of whichever block is open.
+ *
+ * A block is "open" when the selected league belongs to it — there is no separate expanded state to
+ * keep, which is what stops the two rows disagreeing about what is selected.
+ *
+ * A block narrowed to a single member is rendered as that member instead: "CJRA" over a row showing
+ * nothing but BCHL games is a label for a grouping the reader has opted out of most of, and a reader
+ * who follows only the BCHL may not recognise the acronym at all.
+ */
+export function pickerRows(
+  followed: readonly string[],
+  current: PickerId,
+  region: Region = detectRegion(),
+): { top: PickerEntry[]; members: LeagueConfig[] } {
+  const follow = new Set(followed.map((l) => l.toUpperCase()));
+  const openBlock = blockOf(current);
+  const seen = new Set<string>();
+  const top: PickerEntry[] = [];
+
+  for (const cfg of orderedLeagues(region)) {
+    const block = blockOf(cfg.id);
+    if (block) {
+      if (seen.has(block.key)) continue;
+      seen.add(block.key);
+      const members = visibleMembers(block, follow, isBlock(current) ? undefined : (current as LeagueId));
+      const wanted = ALWAYS_VISIBLE.includes(block.key) || members.length > 0 && members.some((m) => follow.has(m.label.toUpperCase()));
+      if (!wanted && block.key !== openBlock?.key) continue;
+      if (members.length === 1) top.push({ kind: 'league', id: members[0].id, label: members[0].label });
+      else top.push({ kind: 'block', key: block.key, label: block.label, members });
+      continue;
+    }
+    if (ALWAYS_VISIBLE.includes(cfg.id) || follow.has(cfg.label.toUpperCase()) || cfg.id === current) {
+      top.push({ kind: 'league', id: cfg.id, label: cfg.label });
+    }
+  }
+
+  const open = top.find((e) => e.kind === 'block' && e.key === openBlock?.key);
+  return { top, members: open && open.kind === 'block' ? open.members : [] };
 }
 
 // The same order applied to the picker entries, so the pills and the Home sections agree. Any league

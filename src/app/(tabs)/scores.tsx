@@ -11,7 +11,7 @@ import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
 import { dayKey, dayLabel, daysBetween } from '@/lib/format';
 import { favMatchIds, isFavGame } from '@/lib/home';
-import { fetchGameDays, fetchScores, groupNcaaByConference, hasLiveGame, leagueColors, LIVE_MAX_AGE_MS, useLeague, type LeagueId } from '@/lib/leagues';
+import { fetchGameDays, fetchScores, groupNcaaByConference, hasLiveGame, leagueColors, LIVE_MAX_AGE_MS, useLeague, type PickerId } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame } from '@/lib/types';
@@ -149,7 +149,7 @@ function SlateHeader({
 
 // One day's slate. `date` omitted = whatever the feed treats as current (used only when a league has
 // no slate list, i.e. the game-days call failed).
-function SlatePage({ league, date, width }: { league: LeagueId; date?: string; width: number }) {
+function SlatePage({ league, date, width }: { league: PickerId; date?: string; width: number }) {
   const t = useTheme();
   const { compact } = useCompact();
   const c = leagueColors(league, t.mode === 'dark');

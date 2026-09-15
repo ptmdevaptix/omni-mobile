@@ -5,7 +5,7 @@ import type { ColorValue } from 'react-native';
 
 import { HeaderActions } from '@/components/header-actions';
 import { OmniHeader } from '@/components/omni-header';
-import { LeagueContext, leagueColors, type LeagueId } from '@/lib/leagues';
+import { LeagueContext, leagueColors, type PickerId } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
 function TabIcon({ name, color, size }: { name: SymbolViewProps['name']; color: ColorValue; size: number }) {
@@ -15,7 +15,7 @@ function TabIcon({ name, color, size }: { name: SymbolViewProps['name']; color: 
 export default function TabsLayout() {
   const t = useTheme();
   // Shared league selection across the content tabs (Scores/Standings/Stats/Teams).
-  const [league, setLeague] = useState<LeagueId>('nhl');
+  const [league, setLeague] = useState<PickerId>('nhl');
   // Scores + Standings tint their chrome (header + tab bar) to the selected league; other tabs stay neutral.
   const chromeBg = leagueColors(league, t.mode === 'dark').bg;
   const leagueChrome = { headerStyle: { backgroundColor: chromeBg }, headerShadowVisible: false, tabBarStyle: { backgroundColor: chromeBg } };

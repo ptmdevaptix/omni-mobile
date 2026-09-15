@@ -10,22 +10,49 @@ import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { WlotlStandings } from '@/components/wlotl-standings';
 import {
-  fetchNcaaStandings, leagueById, leagueColors, useLeague,
-  type NcaaStandingsTeam,
+  blockOf, fetchNcaaStandings, isBlock, leagueById, leagueColors, leaguesIn, useLeague,
+  type LeagueId, type NcaaStandingsTeam, type PickerId,
 } from '@/lib/leagues';
+import { useFollowedLeagues } from '@/lib/followed-leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
 
 export default function StandingsScreen() {
   const t = useTheme();
-  const { league } = useLeague();
-  const kind = leagueById(league).standingsKind;
-  const c = leagueColors(league, t.mode === 'dark');
+  const { league, setLeague } = useLeague();
+  const { followed } = useFollowedLeagues();
+
+  /**
+   * A block has no standings of its own — there is no all-CHL table — so it resolves to one of its
+   * member leagues, and that choice lives HERE rather than in the shared selection. Switching back to
+   * Scores still shows the whole block, which is the point of having a block at all.
+   *
+   * The picker renders the choice: passing `value` puts the member row in the pill bar with one
+   * member active, exactly as on the web, instead of a second chip row underneath saying the same
+   * thing twice.
+   */
+  const members = isBlock(league) ? leaguesIn(league, followed) : [];
+  const [member, setMember] = useState<LeagueId | null>(null);
+  const shown: LeagueId = members.length
+    ? (members.includes(member as LeagueId) ? (member as LeagueId) : members[0])
+    : (league as LeagueId);
+
+  const pick = (id: PickerId) => {
+    // A member of the block already showing: narrow the page, leave the shared selection alone.
+    if (!isBlock(id) && blockOf(id)?.key === league) { setMember(id as LeagueId); return; }
+    // Re-tapping the block would mean "all of them", which this page cannot draw. Stay put.
+    if (id === league) return;
+    setMember(null);
+    setLeague(id);
+  };
+
+  const kind = leagueById(shown).standingsKind;
+  const c = leagueColors(shown, t.mode === 'dark');
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <LeaguePicker />
-      {league === 'nhl' ? <NhlStandings card={c.card} /> : kind === 'ncaa' ? <NcaaStandings card={c.card} /> : <WlotlStandings key={league} league={league} card={c.card} />}
+      <LeaguePicker value={members.length ? shown : league} onChange={pick} />
+      {shown === 'nhl' ? <NhlStandings card={c.card} /> : kind === 'ncaa' ? <NcaaStandings card={c.card} /> : <WlotlStandings key={shown} league={shown} card={c.card} />}
     </View>
   );
 }

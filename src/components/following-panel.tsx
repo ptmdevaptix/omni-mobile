@@ -55,7 +55,7 @@ const SPOKEN: Record<string, string> = {
 export function FollowingPanel() {
   const t = useTheme();
   const router = useRouter();
-  const { followed, loaded, follow, unfollow, isFollowed } = useFollowedLeagues();
+  const { loaded, follow, unfollow, isFollowed } = useFollowedLeagues();
   const { favorites } = useFavorites();
   const teamsQ = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
   const byId = new Map((teamsQ.data ?? []).map((tm) => [tm.id, tm]));
