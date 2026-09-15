@@ -136,24 +136,31 @@ function ageOnSept15(birthDate: string, startYear = currentSeasonStartYear()): n
 }
 
 /**
- * NHL games for the slide test — REGULAR SEASON AND PLAYOFFS.
+ * The games figure the slide test compares against: the most a player has played in ANY ONE season,
+ * counting the regular season and the playoffs together.
  *
- * `careerTotals` counts the regular season only, and reading the threshold off it understated it for
- * exactly the players this note is about. Porter Martone played nine regular-season games and ten in
- * the playoffs: nineteen by the rule that matters, and the card told readers his contract could still
- * slide.
+ * Per season, not per career, because that is the rule. A term slides when the player does not reach
+ * ten games in a season, so 8 then 7 then 2 slides three times — a career total would call that 17
+ * and say the contract had started. It is the largest single season that decides: once he reaches ten
+ * in one, the first year of the deal is burned and nothing can slide it afterwards.
  *
- * Undefined when we hold no season history at all, which is not the same as zero — a player we have
- * never seen play gets no claim made about him. An empty history IS zero: we looked, and there are no
- * NHL rows.
+ * Playoffs count. Porter Martone played nine regular-season games and ten in the playoffs, which is
+ * nineteen by the rule that matters and the reason `careerTotals` — regular season only — was the
+ * wrong source.
+ *
+ * Undefined when we hold no season history at all, which is not the same as zero: a player we have
+ * never seen play gets no claim made about him, while an empty history IS zero, because we looked.
  */
 export function nhlGamesForSlide(
-  seasonTotals?: { leagueAbbrev: string; gameType: number; gamesPlayed?: number }[],
+  seasonTotals?: { season: number; leagueAbbrev: string; gameType: number; gamesPlayed?: number }[],
 ): number | undefined {
   if (!seasonTotals) return undefined;
-  return seasonTotals
-    .filter((r) => r.leagueAbbrev === 'NHL' && (r.gameType === 2 || r.gameType === 3))
-    .reduce((n, r) => n + (r.gamesPlayed ?? 0), 0);
+  const bySeason = new Map<number, number>();
+  for (const r of seasonTotals) {
+    if (r.leagueAbbrev !== 'NHL' || (r.gameType !== 2 && r.gameType !== 3)) continue;
+    bySeason.set(r.season, (bySeason.get(r.season) ?? 0) + (r.gamesPlayed ?? 0));
+  }
+  return bySeason.size ? Math.max(...bySeason.values()) : 0;
 }
 
 /**
@@ -167,10 +174,10 @@ export function nhlGamesForSlide(
  * card says nothing beyond "entry level". A claim about dates moving is worth making only when we can
  * stand behind it.
  *
- * Ten games counts the PLAYOFFS as well as the regular season — see nhlGamesForSlide.
+ * Ten games means ten in a SINGLE season, playoffs included — see nhlGamesForSlide.
  *
- * (The count runs across the career rather than within the season. The two differ only for a player
- * who played under ten in each of two seasons at 18 and 19, which is a handful of players a decade.)
+ * The age test is the one that eventually ends it for everyone: a player who is 20 on September 15
+ * has his entry-level deal start that year whether he has played a game or not.
  */
 export function canSlide(contract: PlayerContract, nhlGamesPlayed?: number, birthDate?: string): boolean {
   if (!contract.entryLevel || !birthDate || nhlGamesPlayed == null) return false;
