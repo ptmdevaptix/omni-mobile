@@ -14,6 +14,10 @@ export type PlayerSeasonStatRow = PlayerStatLine & {
   teamName: string;
   teamAbbrev?: string;
   teamLogo?: string | null;
+  /** Orders two stints in the SAME season — a player traded mid-year has a row for each club. */
+  sequence?: number;
+  /** "/teams/col" when the club has a page of ours. */
+  teamHref?: string | null;
 };
 
 export type PlayerDraft = { year?: number; teamAbbrev?: string; round?: number; overallPick?: number };
