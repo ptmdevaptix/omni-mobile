@@ -11,7 +11,7 @@ import { useCompact } from '@/lib/compact';
 import { useFavorites } from '@/lib/favorites';
 import { dayKey, dayLabel, daysBetween } from '@/lib/format';
 import { favMatchIds, isFavGame } from '@/lib/home';
-import { fetchGameDays, fetchScores, groupNcaaByConference, hasLiveGame, leagueColors, leaguesIn, LIVE_MAX_AGE_MS, useLeague, type PickerId } from '@/lib/leagues';
+import { fetchGameDays, fetchScores, groupByMemberLeague, groupNcaaByConference, hasLiveGame, isBlock, leagueColors, leaguesIn, LIVE_MAX_AGE_MS, useLeague, type PickerId } from '@/lib/leagues';
 import { useFollowedLeagues } from '@/lib/followed-leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
 import { useTheme } from '@/lib/theme';
@@ -164,7 +164,8 @@ function SlatePage({ league, date, width }: { league: PickerId; date?: string; w
   const c = leagueColors(league, t.mode === 'dark');
   // Same scope as the slate list above — a block shows the member leagues the reader follows, so the
   // key has to say which, or switching what you follow serves the old set from cache.
-  const scope = leaguesIn(league, followed).join(',');
+  const members = useMemo(() => leaguesIn(league, followed), [league, followed]);
+  const scope = members.join(',');
   const q = useQuery({
     queryKey: ['scores', league, scope, date ?? 'live'],
     queryFn: () => fetchScores(league, date, followed),
@@ -190,13 +191,18 @@ function SlatePage({ league, date, width }: { league: PickerId; date?: string; w
     return [...all].sort((a, b) => Number(isFavGame(b, favIds)) - Number(isFavGame(a, favIds))); // stable
   }, [data, favIds]);
   const teams = data?.teamsById ?? {};
-  // The NCAA slate carries a conference sub-heading before each run (Non-Conference last); every other
-  // league is one flat run. Favorites still lead within their run.
+  // Sub-headings before each run: a block splits by member league (OHL, then WHL, then QMJHL), the
+  // NCAA by conference (Non-Conference last). Every other league is one flat run, and so is a block
+  // with only one member playing — a heading over the only run is noise. Favorites lead within a run.
   const rows = useMemo<Row[]>(() => {
     const per = compact ? 2 : 1;
+    if (isBlock(league)) {
+      const grouped = groupByMemberLeague(games, members);
+      return grouped.length < 2 ? toRows(games, per) : grouped.flatMap(([heading, grp]) => [{ heading }, ...toRows(grp, per)]);
+    }
     if (league !== 'ncaa' || !games.some((g) => g.conference)) return toRows(games, per);
     return groupNcaaByConference(games).flatMap(([heading, grp]) => [{ heading }, ...toRows(grp, per)]);
-  }, [games, compact, league]);
+  }, [games, compact, league, members]);
 
   return (
     <View style={{ width, flex: 1 }}>

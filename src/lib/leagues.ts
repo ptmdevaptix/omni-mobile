@@ -375,6 +375,29 @@ export function groupNcaaByConference(games: ScoreGame[]): [string, ScoreGame[]]
   return [...by.entries()].sort(([a], [b]) => compareNcaaGroups(a, b));
 }
 
+/**
+ * A block's slate, split into one run per member league.
+ *
+ * A combined CHL slate is a list a reader has to sort in their head — the same reason the NCAA slate
+ * carries conference headings. Ordered by the block's own member order, not by size, so the headings
+ * stay put from day to day; a member with nothing on is simply absent.
+ *
+ * An interleague fixture is filed once, under the host league, the way the feed files it. Both
+ * leagues are inside the same block here, so there is nothing to be gained by listing it twice.
+ */
+export function groupByMemberLeague(games: ScoreGame[], members: readonly LeagueId[]): [string, ScoreGame[]][] {
+  const order = members.map((m) => leagueById(m));
+  const by = new Map<string, ScoreGame[]>();
+  for (const g of games) {
+    const home = gameLeague(g);
+    const cfg = order.find((l) => l.subCode?.toUpperCase() === home) ?? order.find((l) => inLeague(g, l.subCode ?? ''));
+    if (!cfg) continue;   // not one of the leagues on show; fetchScores has already filtered these out
+    if (!by.has(cfg.label)) by.set(cfg.label, []);
+    by.get(cfg.label)!.push(g);
+  }
+  return order.map((l) => [l.label, by.get(l.label) ?? []] as [string, ScoreGame[]]).filter(([, gs]) => gs.length);
+}
+
 // NHL divisions in conference order (Eastern, then Western) rather than alphabetically, matching the
 // web team grid. Alphabetical interleaves the conferences: Atlantic, Central, Metropolitan, Pacific.
 const NHL_DIVISION_ORDER = ['Atlantic', 'Metropolitan', 'Central', 'Pacific'];
