@@ -136,6 +136,27 @@ function ageOnSept15(birthDate: string, startYear = currentSeasonStartYear()): n
 }
 
 /**
+ * NHL games for the slide test — REGULAR SEASON AND PLAYOFFS.
+ *
+ * `careerTotals` counts the regular season only, and reading the threshold off it understated it for
+ * exactly the players this note is about. Porter Martone played nine regular-season games and ten in
+ * the playoffs: nineteen by the rule that matters, and the card told readers his contract could still
+ * slide.
+ *
+ * Undefined when we hold no season history at all, which is not the same as zero — a player we have
+ * never seen play gets no claim made about him. An empty history IS zero: we looked, and there are no
+ * NHL rows.
+ */
+export function nhlGamesForSlide(
+  seasonTotals?: { leagueAbbrev: string; gameType: number; gamesPlayed?: number }[],
+): number | undefined {
+  if (!seasonTotals) return undefined;
+  return seasonTotals
+    .filter((r) => r.leagueAbbrev === 'NHL' && (r.gameType === 2 || r.gameType === 3))
+    .reduce((n, r) => n + (r.gamesPlayed ?? 0), 0);
+}
+
+/**
  * Can this entry-level deal still slide?
  *
  * Sliding is not a property of ELCs in general. It applies to a player of 18 or 19 who does not reach
@@ -146,9 +167,10 @@ function ageOnSept15(birthDate: string, startYear = currentSeasonStartYear()): n
  * card says nothing beyond "entry level". A claim about dates moving is worth making only when we can
  * stand behind it.
  *
- * (Ten games is counted across the career rather than within the season. The two differ only for a
- * player who played under ten in each of two seasons at 18 and 19, and the career figure is the one
- * the payload carries.)
+ * Ten games counts the PLAYOFFS as well as the regular season — see nhlGamesForSlide.
+ *
+ * (The count runs across the career rather than within the season. The two differ only for a player
+ * who played under ten in each of two seasons at 18 and 19, which is a handful of players a decade.)
  */
 export function canSlide(contract: PlayerContract, nhlGamesPlayed?: number, birthDate?: string): boolean {
   if (!contract.entryLevel || !birthDate || nhlGamesPlayed == null) return false;

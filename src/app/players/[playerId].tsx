@@ -5,7 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { canSlide, ContractTimeline, contractPlayedOut, contractTimeline } from '@/components/contract-timeline';
+import { canSlide, ContractTimeline, contractPlayedOut, contractTimeline, nhlGamesForSlide } from '@/components/contract-timeline';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
@@ -224,7 +224,7 @@ function ContractCard({ p }: { p: PlayerDetail }) {
   if (!c || isFreeAgent(c)) return null;
   const timeline = contractTimeline(c);
   // Only for a player the rule can still reach — see canSlide.
-  const slides = canSlide(c, p.careerTotals?.gamesPlayed, p.birthDate);
+  const slides = canSlide(c, nhlGamesForSlide(p.seasonTotals), p.birthDate);
 
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
