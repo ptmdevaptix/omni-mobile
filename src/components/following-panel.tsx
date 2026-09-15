@@ -4,21 +4,53 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
-import { CHL_MEMBER_LEAGUES, useFollowedLeagues, type FollowTarget } from '@/lib/followed-leagues';
-import { fetchAllTeams, homeLeagueOrder } from '@/lib/leagues';
+import { CHL_MEMBER_LEAGUES, CJRA_MEMBER_LEAGUES, useFollowedLeagues, type FollowTarget, type FollowedLeague } from '@/lib/followed-leagues';
+import { fetchAllTeams } from '@/lib/leagues';
 import { useTheme } from '@/lib/theme';
 
 // The controls for what Home shows: followed leagues and favorite teams. Sits at the BOTTOM of Home,
 // as on the web — for a first-time user the slate above is one league and this is in view; for an
 // established user it is a settings-grade control they touch rarely.
 //
-// The CHL is a cluster — All · OHL · WHL · QMJHL — always expanded: a casual fan knows "WHL" long
-// before they know "CHL", so the member leagues have to be visible on the row.
-//
 // Removing asks first (a native alert — this is iOS); adding is one tap.
 
-const LABEL: Record<string, string> = { NHL: 'NHL', AHL: 'AHL', ECHL: 'ECHL', NCAA: 'NCAA', USHL: 'USHL', CHL: 'All', OHL: 'OHL', WHL: 'WHL', QMJHL: 'QMJHL' };
-const SPOKEN: Record<string, string> = { CHL: 'all CHL leagues' };
+/**
+ * The leagues, grouped by what they actually are — mirroring GROUPS in the web's following-manager.
+ *
+ * Fourteen chips in one row is a list of acronyms: nothing tells a reader that the AHL and ECHL are
+ * the same tier, or which of six four-letter leagues are the Canadian Junior A ones. The heading
+ * carries that, so the section can be skimmed by tier rather than read end to end.
+ *
+ * `block` marks a group that can also be followed as one. The CHL and Canadian Jr A get an "All"
+ * chip because nobody who wants a whole tier should have to tap three or six times — but the members
+ * stay visible beside it, because a casual fan knows "WHL" long before they know "CHL", and six
+ * leagues across five provinces are not interchangeable.
+ */
+type LeagueGroup = { label: string; block?: FollowTarget; members: readonly FollowedLeague[] };
+
+const GROUPS: readonly LeagueGroup[] = [
+  { label: 'NHL', members: ['NHL'] },
+  // One tier: both are North American minor pro, which is why they share a colour on the cards too.
+  { label: 'NA Minor Pro', members: ['AHL', 'ECHL'] },
+  { label: 'College', members: ['NCAA'] },
+  { label: 'Canadian Major Junior', block: 'CHL', members: CHL_MEMBER_LEAGUES },
+  { label: 'US Junior', members: ['USHL'] },
+  { label: 'Canadian Jr. A', block: 'CJRA', members: CJRA_MEMBER_LEAGUES },
+];
+
+const LABEL: Record<string, string> = {
+  NHL: 'NHL', AHL: 'AHL', ECHL: 'ECHL', NCAA: 'NCAA', USHL: 'USHL',
+  CHL: 'All', OHL: 'OHL', WHL: 'WHL', QMJHL: 'QMJHL',
+  CJRA: 'All', BCHL: 'BCHL', AJHL: 'AJHL', SJHL: 'SJHL', MJHL: 'MJHL', OJHL: 'OJHL', CCHL: 'CCHL',
+};
+// Spoken names for the accessible labels and the removal alert, where an acronym or a bare "All"
+// would not say what is about to disappear.
+const SPOKEN: Record<string, string> = {
+  CHL: 'all CHL leagues',
+  CJRA: 'all six Canadian Junior A leagues',
+  BCHL: 'the BCHL', AJHL: 'the AJHL', SJHL: 'the SJHL',
+  MJHL: 'the MJHL', OJHL: 'the OJHL', CCHL: 'the CCHL',
+};
 
 export function FollowingPanel() {
   const t = useTheme();
@@ -57,14 +89,6 @@ export function FollowingPanel() {
     );
   };
 
-  // Top-level order by region (the CHL block sits where its member leagues would).
-  const seen = new Set<string>();
-  const tops: string[] = [];
-  for (const lg of homeLeagueOrder()) {
-    const top = (CHL_MEMBER_LEAGUES as readonly string[]).includes(lg) ? 'CHL' : lg;
-    if (!seen.has(top)) { seen.add(top); tops.push(top); }
-  }
-
   return (
     <View style={[styles.panel, { backgroundColor: t.card, borderColor: t.border }]}>
       <Text style={{ color: t.text, fontSize: 17, fontWeight: '700' }}>Following</Text>
@@ -73,16 +97,16 @@ export function FollowingPanel() {
       </Text>
 
       <Text style={[styles.label, { color: t.sub }]}>Leagues</Text>
-      <View style={styles.wrap}>
-        {tops.map((top) =>
-          top !== 'CHL' ? chip(top as FollowTarget) : (
-            <View key="chl" style={[styles.cluster, { borderColor: t.border }]} accessibilityRole="none" accessibilityLabel="CHL leagues">
-              <Text style={{ color: t.sub, fontSize: 12, fontWeight: '800', marginLeft: 6 }}>CHL</Text>
-              {chip('CHL')}
-              {CHL_MEMBER_LEAGUES.map((l) => chip(l))}
+      <View style={{ gap: 12 }}>
+        {GROUPS.map((g) => (
+          <View key={g.label} accessibilityRole="none" accessibilityLabel={`${g.label} leagues`}>
+            <Text style={[styles.groupLabel, { color: t.sub }]}>{g.label}</Text>
+            <View style={styles.wrap}>
+              {g.block && chip(g.block)}
+              {g.members.map((l) => chip(l))}
             </View>
-          ),
-        )}
+          </View>
+        ))}
       </View>
 
       <Text style={[styles.label, { color: t.sub }]}>Teams</Text>
@@ -130,5 +154,5 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   teamChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 6 },
-  cluster: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, borderStyle: 'dashed', padding: 4 },
+  groupLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, marginBottom: 6, opacity: 0.85 },
 });

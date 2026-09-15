@@ -1,19 +1,28 @@
 // Followed leagues: what Home shows besides favorite teams. Stored locally (AsyncStorage) like favorites.
 //
-// The CHL is followed by member league — OHL, WHL, QMJHL — because they play on different nights and
-// many fans care about one of them. "CHL" is accepted as shorthand for all three (follow/unfollow, and
-// anything stored that way) but is never what gets stored. Mirrors lib/user-preferences.ts on the web.
+// The CHL and Canadian Jr A are followed by MEMBER league — OHL/WHL/QMJHL, BCHL/AJHL/SJHL/MJHL/OJHL/
+// CCHL — because they play on different nights and most fans care about one of them. "CHL" and "CJRA"
+// are accepted as shorthand for all their members (follow/unfollow, and anything stored that way) but
+// neither is ever what gets stored. Mirrors lib/user-preferences.ts on the web, which must not drift.
 //
 // Absent key → NHL, so a first-time user sees a real slate. An explicitly empty list is a real state
 // (favorites only) and is stored as "[]" rather than falling back.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-export type FollowedLeague = 'NHL' | 'AHL' | 'ECHL' | 'NCAA' | 'USHL' | 'OHL' | 'WHL' | 'QMJHL';
-export type FollowTarget = FollowedLeague | 'CHL';
+export type FollowedLeague =
+  | 'NHL' | 'AHL' | 'ECHL' | 'NCAA' | 'USHL'
+  | 'OHL' | 'WHL' | 'QMJHL'
+  | 'BCHL' | 'AJHL' | 'SJHL' | 'MJHL' | 'OJHL' | 'CCHL';
+export type FollowTarget = FollowedLeague | 'CHL' | 'CJRA';
 
 export const CHL_MEMBER_LEAGUES: readonly FollowedLeague[] = ['OHL', 'WHL', 'QMJHL'];
-export const FOLLOWABLE_LEAGUES: readonly FollowedLeague[] = ['NHL', 'AHL', 'ECHL', 'NCAA', 'USHL', ...CHL_MEMBER_LEAGUES];
+// Same reasoning as the CHL, more so: six leagues across five provinces, playing on different
+// nights. Following "Canadian Jr A" is stored as its members, never as the block.
+export const CJRA_MEMBER_LEAGUES: readonly FollowedLeague[] = ['BCHL', 'AJHL', 'SJHL', 'MJHL', 'OJHL', 'CCHL'];
+export const FOLLOWABLE_LEAGUES: readonly FollowedLeague[] = [
+  'NHL', 'AHL', 'ECHL', 'NCAA', 'USHL', ...CHL_MEMBER_LEAGUES, ...CJRA_MEMBER_LEAGUES,
+];
 export const DEFAULT_FOLLOWED_LEAGUES: readonly FollowedLeague[] = ['NHL'];
 
 const KEY = 'followedLeagues';
@@ -24,6 +33,7 @@ const isFollowable = (v: unknown): v is FollowedLeague =>
 /** A stored or requested value → the concrete leagues it means. Unknown values mean nothing. */
 export function expandFollowTarget(v: unknown): FollowedLeague[] {
   if (v === 'CHL') return [...CHL_MEMBER_LEAGUES];
+  if (v === 'CJRA') return [...CJRA_MEMBER_LEAGUES];
   return isFollowable(v) ? [v] : [];
 }
 
