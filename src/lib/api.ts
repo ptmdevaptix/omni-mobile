@@ -60,6 +60,9 @@ export function teamHeaderPath(rawId: string): string {
   if (teamId.startsWith("chl-")) return `/chl-team/${teamId.slice(4)}`;
   if (teamId.startsWith("ncaa-")) return `/ncaa-team/${teamId.slice(5)}`;
   if (teamId.startsWith("ushl-")) return `/ushl-team/${teamId.slice(5)}`;
+  // "cjra-bchl-16" → /cjra-team/bchl-16. The league stays in the path because the six are separate
+  // HockeyTech clients; the id alone would not say which one to ask.
+  if (teamId.startsWith("cjra-")) return `/cjra-team/${teamId.slice(5)}`;
   return `/team/${teamId}`;
 }
 
@@ -70,5 +73,8 @@ export function leagueOf(rawId: string): string {
   if (teamId.startsWith("chl-")) return "CHL";
   if (teamId.startsWith("ncaa-")) return "NCAA";
   if (teamId.startsWith("ushl-")) return "USHL";
+  // The BLOCK, not the individual league — teamTabs and the rest ask this to decide what a club
+  // shows, and the answer is the same for all six.
+  if (teamId.startsWith("cjra-")) return "CJRA";
   return "NHL";
 }

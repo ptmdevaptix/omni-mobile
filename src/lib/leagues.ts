@@ -6,18 +6,30 @@ import { api } from "./api";
 import { detectRegion, type Region } from "./region";
 import type { ScoreGame, ScoresResponse, ScoreTeam, StandingsTeam } from "./types";
 
-export type LeagueId = "nhl" | "ahl" | "echl" | "ohl" | "whl" | "qmjhl" | "ushl" | "ncaa";
+export type LeagueId =
+  | "nhl" | "ahl" | "echl"
+  | "ohl" | "whl" | "qmjhl"
+  | "ushl" | "ncaa"
+  // Canadian Junior A, west to east. Six separate leagues that share one scoreboard feed and one
+  // top-level block, exactly as OHL/WHL/QMJHL share the CHL's — see CJRA_LEAGUES in the web repo.
+  | "bchl" | "ajhl" | "sjhl" | "mjhl" | "ojhl" | "cchl";
 
 export type LeagueConfig = {
   id: LeagueId;
   label: string; // short label for the picker
   name: string; // full name
   scoresPath: string; // scores endpoint
-  chlCode?: string; // for OHL/WHL/QMJHL: filter the combined /chl-scores feed by game.top
+  // Sub-league code, for the leagues that share a combined feed with their siblings: it filters that
+  // feed down to this league's games and is the `sub` the game-days endpoint expects. Named for what
+  // it does rather than for the CHL, which was the only block that had one until CJRA arrived.
+  subCode?: string;
+  // The block this league belongs to, when the game-days endpoint groups it under one — "CHL" for
+  // OHL/WHL/QMJHL, "CJRA" for the Canadian Jr A six. Absent means the league is its own top level.
+  topCode?: string;
   standingsPath: string;
   standingsKind: "wlotl" | "ncaa"; // NHL/AHL/CHL vs NCAA (W-L-T, conference-based)
   statsPath: string; // "" = no leader boards for this league
-  teamKind: "nhl" | "ahl" | "echl" | "chl" | "ushl" | "ncaa"; // how to build a /teams/<id> route id from a standings row
+  teamKind: "nhl" | "ahl" | "echl" | "chl" | "ushl" | "ncaa" | "cjra"; // how to build a /teams/<id> route id from a standings row
   hasConferences?: boolean; // NCAA
 };
 
@@ -27,11 +39,21 @@ export const LEAGUES: LeagueConfig[] = [
   // Scores are a seeded slate + results overlay and there is no stats feed, so no leader boards; the
   // web's ECHL team pages carry identity + affiliations, schedule and roster, and so do ours.
   { id: "echl", label: "ECHL", name: "ECHL", scoresPath: "/echl-scores", standingsPath: "/echl-standings", standingsKind: "wlotl", statsPath: "", teamKind: "echl" },
-  { id: "ohl", label: "OHL", name: "Ontario Hockey League", scoresPath: "/chl-scores", chlCode: "OHL", standingsPath: "/ht-standings/ohl", standingsKind: "wlotl", statsPath: "/chl-stats/ohl", teamKind: "chl" },
-  { id: "whl", label: "WHL", name: "Western Hockey League", scoresPath: "/chl-scores", chlCode: "WHL", standingsPath: "/ht-standings/whl", standingsKind: "wlotl", statsPath: "/chl-stats/whl", teamKind: "chl" },
-  { id: "qmjhl", label: "QMJHL", name: "Quebec Maritimes Junior Hockey League", scoresPath: "/chl-scores", chlCode: "QMJHL", standingsPath: "/ht-standings/qmjhl", standingsKind: "wlotl", statsPath: "/chl-stats/qmjhl", teamKind: "chl" },
+  { id: "ohl", label: "OHL", name: "Ontario Hockey League", scoresPath: "/chl-scores", subCode: "OHL", topCode: "CHL", standingsPath: "/ht-standings/ohl", standingsKind: "wlotl", statsPath: "/chl-stats/ohl", teamKind: "chl" },
+  { id: "whl", label: "WHL", name: "Western Hockey League", scoresPath: "/chl-scores", subCode: "WHL", topCode: "CHL", standingsPath: "/ht-standings/whl", standingsKind: "wlotl", statsPath: "/chl-stats/whl", teamKind: "chl" },
+  { id: "qmjhl", label: "QMJHL", name: "Quebec Maritimes Junior Hockey League", scoresPath: "/chl-scores", subCode: "QMJHL", topCode: "CHL", standingsPath: "/ht-standings/qmjhl", standingsKind: "wlotl", statsPath: "/chl-stats/qmjhl", teamKind: "chl" },
   { id: "ushl", label: "USHL", name: "United States Hockey League", scoresPath: "/ushl-scores", standingsPath: "/ht-standings/ushl", standingsKind: "wlotl", statsPath: "/ht-stats/ushl", teamKind: "ushl" },
   { id: "ncaa", label: "NCAA", name: "NCAA Division I", scoresPath: "/ncaa-scores", standingsPath: "/ncaa-standings", standingsKind: "ncaa", statsPath: "/ncaa-stats", teamKind: "ncaa", hasConferences: true },
+  // ── Canadian Junior A ───────────────────────────────────────────────────────
+  // Six leagues on the same HockeyTech platform, each with its own standings and stats but sharing
+  // the /cjra-scores feed the way OHL/WHL/QMJHL share /chl-scores. Listed west to east, matching
+  // CJRA_LEAGUES in the web repo; the two orders must not drift.
+  { id: "bchl", label: "BCHL", name: "British Columbia Hockey League", scoresPath: "/cjra-scores", subCode: "BCHL", topCode: "CJRA", standingsPath: "/ht-standings/bchl", standingsKind: "wlotl", statsPath: "/ht-stats/bchl", teamKind: "cjra" },
+  { id: "ajhl", label: "AJHL", name: "Alberta Junior Hockey League", scoresPath: "/cjra-scores", subCode: "AJHL", topCode: "CJRA", standingsPath: "/ht-standings/ajhl", standingsKind: "wlotl", statsPath: "/ht-stats/ajhl", teamKind: "cjra" },
+  { id: "sjhl", label: "SJHL", name: "Saskatchewan Junior Hockey League", scoresPath: "/cjra-scores", subCode: "SJHL", topCode: "CJRA", standingsPath: "/ht-standings/sjhl", standingsKind: "wlotl", statsPath: "/ht-stats/sjhl", teamKind: "cjra" },
+  { id: "mjhl", label: "MJHL", name: "Manitoba Junior Hockey League", scoresPath: "/cjra-scores", subCode: "MJHL", topCode: "CJRA", standingsPath: "/ht-standings/mjhl", standingsKind: "wlotl", statsPath: "/ht-stats/mjhl", teamKind: "cjra" },
+  { id: "ojhl", label: "OJHL", name: "Ontario Junior Hockey League", scoresPath: "/cjra-scores", subCode: "OJHL", topCode: "CJRA", standingsPath: "/ht-standings/ojhl", standingsKind: "wlotl", statsPath: "/ht-stats/ojhl", teamKind: "cjra" },
+  { id: "cchl", label: "CCHL", name: "Central Canada Hockey League", scoresPath: "/cjra-scores", subCode: "CCHL", topCode: "CJRA", standingsPath: "/ht-standings/cchl", standingsKind: "wlotl", statsPath: "/ht-stats/cchl", teamKind: "cjra" },
 ];
 
 export const leagueById = (id: LeagueId): LeagueConfig => LEAGUES.find((l) => l.id === id) ?? LEAGUES[0];
@@ -47,12 +69,20 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   chl:  { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red
   ncaa: { bg: ['#eaeef8', '#111f42'], card: ['#dae2f4', '#0a1024'], pill: ['#2a4a9c', '#6a97ff'] }, // blue
   ushl: { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }, // green
+  // The six Canadian Jr A leagues share one tint, as OHL/WHL/QMJHL share the CHL's: the colour
+  // encodes the BLOCK, and six hues would imply six unrelated competitions. Purple because every
+  // other hue is spoken for — grey NHL, amber AHL/ECHL, red CHL, blue NCAA, green USHL.
+  cjra: { bg: ['#f1ecf8', '#1e1430'], card: ['#e5dbf2', '#120b1d'], pill: ['#6b3fa0', '#a684e0'] }, // purple
   // NB green was previously reserved for a future Euro group; USHL took it. Pick a new hue for Euro.
 };
 // The ECHL shares the AHL's colour, as on the web: what the colour encodes is the tier, and both are
 // North American minor pro. Two near-identical hues would imply a distinction that isn't there.
+const CJRA_IDS = new Set<LeagueId>(['bchl', 'ajhl', 'sjhl', 'mjhl', 'ojhl', 'cchl']);
 const leagueKey = (id: LeagueId): string =>
-  id === 'ohl' || id === 'whl' || id === 'qmjhl' ? 'chl' : id === 'echl' ? 'ahl' : id;
+  id === 'ohl' || id === 'whl' || id === 'qmjhl' ? 'chl'
+  : CJRA_IDS.has(id) ? 'cjra'
+  : id === 'echl' ? 'ahl'
+  : id;
 
 export function leagueColors(id: LeagueId, dark: boolean): { bg: string; card: string; pill: string } {
   const tint = LEAGUE_TINTS[leagueKey(id)] ?? LEAGUE_TINTS.nhl;
@@ -74,7 +104,8 @@ export const useLeague = () => useContext(LeagueContext);
 // every CHL game. The game id prefix is the dependable key — it's the same one the web app's
 // /games/{prefix}-{id} routes use. `path` is NOT a safe first choice: it holds the sub-league on CHL
 // feeds (["QMJHL"]) but the conference/division on NHL ones (["EAST","ATL","MET"]).
-const KNOWN_LEAGUES = new Set(["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"]);
+const KNOWN_LEAGUES = new Set(["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL",
+  "BCHL", "AJHL", "SJHL", "MJHL", "OJHL", "CCHL"]);
 
 export function gameLeague(g: ScoreGame): string {
   const prefix = (g.id ?? "").split("-")[0].toUpperCase();
@@ -128,7 +159,7 @@ const inLeague = (g: ScoreGame, code: string) => {
 export async function fetchScores(id: LeagueId, date?: string): Promise<ScoresResponse> {
   const cfg = leagueById(id);
   const r = await api<ScoresResponse>(date ? `${cfg.scoresPath}?date=${date}` : cfg.scoresPath);
-  const games = cfg.chlCode ? (r.games ?? []).filter((g) => inLeague(g, cfg.chlCode!)) : (r.games ?? []);
+  const games = cfg.subCode ? (r.games ?? []).filter((g) => inLeague(g, cfg.subCode!)) : (r.games ?? []);
   return { ...r, games };
 }
 
@@ -140,8 +171,8 @@ export async function fetchScores(id: LeagueId, date?: string): Promise<ScoresRe
 // and the caller falls back to the single live-plus-pin view.
 export async function fetchGameDays(id: LeagueId, from: string, to: string): Promise<string[]> {
   const cfg = leagueById(id);
-  const top = cfg.chlCode ? "CHL" : cfg.label;
-  const qs = new URLSearchParams({ from, to, top, ...(cfg.chlCode ? { sub: cfg.chlCode } : {}) });
+  const top = cfg.topCode ?? cfg.label;
+  const qs = new URLSearchParams({ from, to, top, ...(cfg.subCode ? { sub: cfg.subCode } : {}) });
   const r = await api<{ days?: Record<string, number>; supported?: boolean }>(`/game-days?${qs.toString()}`);
   if (r.supported === false) return [];
   return Object.keys(r.days ?? {}).sort();
@@ -175,6 +206,9 @@ export async function fetchStandings(id: LeagueId): Promise<StandingsTeam[]> {
       : cfg.teamKind === "echl" ? `echl-${echlSlugByCode.get(String(r.abbr ?? "").toUpperCase()) ?? String(r.abbr ?? "").toLowerCase()}`
       : cfg.teamKind === "chl" ? `chl-${cfg.id}-${r.teamId}`
       : cfg.teamKind === "ushl" ? `ushl-${r.teamId}`
+      // `cjra-<league>-<id>`, nested the way the CHL nests — the web builds the same id from
+      // teamIdPrefix, and a team page keys on it.
+      : cfg.teamKind === "cjra" ? `cjra-${cfg.id}-${r.teamId}`
       : String(r.abbr ?? "").toLowerCase(),
   }));
 }
@@ -240,9 +274,12 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 // Only NCAA and the CHL block swap on region: US users see NCAA first, everyone else sees CHL first.
 // USHL is last in BOTH — despite being a US league, Canadian junior is followed more in the US than
 // the USHL is. Region detection is best-effort — see ./region.
+// West to east, and last in both regions — matching CJRA_SUB_LEAGUES in the web's lib/league-order.ts.
+const CJRA_ORDER = ["BCHL", "AJHL", "SJHL", "MJHL", "OJHL", "CCHL"] as const;
+
 const LEAGUE_ORDER: Record<Region, readonly string[]> = {
-  US: ["NHL", "AHL", "ECHL", "NCAA", "OHL", "WHL", "QMJHL", "USHL"],
-  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL"],
+  US: ["NHL", "AHL", "ECHL", "NCAA", "OHL", "WHL", "QMJHL", "USHL", ...CJRA_ORDER],
+  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL", ...CJRA_ORDER],
 };
 
 // Section order for the Home hub, by the device's region.
@@ -322,7 +359,11 @@ export function compareTeamGroups(league: LeagueId, a: string, b: string): numbe
 
 export function leagueFamily(label: string): string {
   const l = label.toUpperCase();
-  return l === 'OHL' || l === 'WHL' || l === 'QMJHL' ? 'CHL' : l;
+  if (l === 'OHL' || l === 'WHL' || l === 'QMJHL') return 'CHL';
+  // Cross-league play is COMMON here — the six share a border and a schedule — so the family has to
+  // be right or an OJHL side visiting a CCHL rink lands in its own stray section.
+  if ((CJRA_ORDER as readonly string[]).includes(l)) return 'CJRA';
+  return l;
 }
 
 // The same order applied to the picker entries, so the pills and the Home sections agree. Any league
@@ -347,7 +388,7 @@ export async function fetchAllScores(date: string): Promise<{
   teamsById: Record<string, ScoreTeam>;
 }> {
   const empty = () => ({ games: [] as ScoreGame[], teamsById: {} as Record<string, ScoreTeam> });
-  const paths = ["/scores", "/ahl-scores", "/echl-scores", "/chl-scores", "/ushl-scores", "/ncaa-scores"];
+  const paths = ["/scores", "/ahl-scores", "/echl-scores", "/chl-scores", "/ushl-scores", "/ncaa-scores", "/cjra-scores"];
 
   const live = await Promise.all(paths.map((p) => api<ScoresResponse>(`${p}?date=${date}`).catch(empty)));
   const games = live.flatMap((r) => r.games ?? []);

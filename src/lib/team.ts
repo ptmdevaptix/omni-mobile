@@ -16,6 +16,9 @@ export function teamTabs(teamId: string): TeamTab[] {
   // no news scanner coverage. Matches what the web's ECHL team pages carry.
   if (league === 'ECHL') return ['schedule', 'roster'];
   if (league === 'USHL') return ['home', 'schedule', 'roster', 'stats'];
+  // Canadian Jr A: everything except News. Not a judgement about coverage — /cjra-team/<id>/news does
+  // not exist on the API and returns the 404 HTML page, so the tab would error rather than sit empty.
+  if (league === 'CJRA') return ['home', 'schedule', 'roster', 'stats'];
   if (league === 'NHL') return ['home', 'schedule', 'roster', 'stats', 'prospects', 'news'];
   return ['home', 'schedule', 'roster', 'stats', 'news'];
 }
