@@ -5,7 +5,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
-import { compareTeamGroups, fetchAllTeams, LEAGUES, leagueById, leagueColors, type LeagueId, type TeamDirectoryEntry } from '@/lib/leagues';
+import { compareTeamGroups, fetchAllTeams, leagueById, leagueColors, visibleLeagues, type LeagueId, type TeamDirectoryEntry } from '@/lib/leagues';
+import { useFollowedLeagues } from '@/lib/followed-leagues';
 import { useTheme } from '@/lib/theme';
 
 // Team browser (reached from More → Teams). Local league picker (it's outside the tabs' shared league
@@ -14,6 +15,7 @@ export default function TeamsBrowserScreen() {
   const t = useTheme();
   const dark = t.mode === 'dark';
   const [league, setLeague] = useState<LeagueId>('nhl');
+  const { followed } = useFollowedLeagues();
   const c = leagueColors(league, dark);
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
@@ -35,7 +37,7 @@ export default function TeamsBrowserScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.pills}>
-        {LEAGUES.map((l) => {
+        {visibleLeagues(followed, league).map((l) => {
           const on = l.id === league;
           const pill = leagueColors(l.id, dark).pill;
           return (

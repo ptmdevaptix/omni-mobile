@@ -366,6 +366,40 @@ export function leagueFamily(label: string): string {
   return l;
 }
 
+/**
+ * Leagues the picker always offers, whatever the reader follows.
+ *
+ * The ones a general hockey reader is assumed to want. Dropping one behind a setting would make the
+ * app look like it had lost coverage. Mirrors ALWAYS_VISIBLE_LEAGUES in the web's lib/visible-leagues
+ * — the web lists the CHL as a block, which here means its three member leagues.
+ */
+const ALWAYS_VISIBLE: readonly LeagueId[] = ['nhl', 'ahl', 'echl', 'ncaa', 'ushl', 'ohl', 'whl', 'qmjhl'];
+
+/**
+ * Which leagues the picker offers.
+ *
+ * Fourteen pills is a wall, and the ones at the end are the ones fewest readers want — so a league
+ * outside the core set appears once it is FOLLOWED, which is the same list that decides what Home
+ * shows. Following two of the six Canadian Jr A leagues and still being shown all six makes the row
+ * stop being the reader's leagues and go back to being a list of everything we carry.
+ *
+ * `current` survives regardless, so arriving on a league — a remembered selection, a tap through
+ * from a team — never leaves you on a page whose own league is missing from the picker above it.
+ *
+ * Presentation only: every league's data and routes are untouched, and Scores still has every league
+ * for anyone who follows it.
+ */
+export function visibleLeagues(
+  followed: readonly string[],
+  current?: LeagueId,
+  region: Region = detectRegion(),
+): LeagueConfig[] {
+  const follow = new Set(followed.map((l) => l.toUpperCase()));
+  return orderedLeagues(region).filter(
+    (l) => ALWAYS_VISIBLE.includes(l.id) || follow.has(l.label.toUpperCase()) || l.id === current,
+  );
+}
+
 // The same order applied to the picker entries, so the pills and the Home sections agree. Any league
 // missing from LEAGUE_ORDER falls to the end rather than disappearing.
 export function orderedLeagues(region: Region = detectRegion()): LeagueConfig[] {

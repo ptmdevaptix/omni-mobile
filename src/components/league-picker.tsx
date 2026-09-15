@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { leagueColors, orderedLeagues, useLeague } from '@/lib/leagues';
+import { leagueColors, useLeague, visibleLeagues } from '@/lib/leagues';
+import { useFollowedLeagues } from '@/lib/followed-leagues';
 import { useTheme } from '@/lib/theme';
 
 // Global league selector shown above the content tabs (Scores/Standings/Stats/Teams). Reads the shared
@@ -10,6 +11,7 @@ export function LeaguePicker() {
   const t = useTheme();
   const dark = t.mode === 'dark';
   const { league, setLeague } = useLeague();
+  const { followed } = useFollowedLeagues();
   return (
     <ScrollView
       horizontal
@@ -17,7 +19,7 @@ export function LeaguePicker() {
       style={{ backgroundColor: 'transparent', flexGrow: 0 }}
       contentContainerStyle={styles.row}
     >
-      {orderedLeagues().map((l) => {
+      {visibleLeagues(followed, league).map((l) => {
         const active = l.id === league;
         const pill = leagueColors(l.id, dark).pill;
         return (
