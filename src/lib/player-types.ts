@@ -96,4 +96,10 @@ export type PlayerSearchResult = {
   active?: boolean | null;
   /** The league he is best associated with — "NHL", "OHL" — and what the ranking sorted on. */
   league?: string | null;
+  /**
+   * The club he actually PLAYS for, which for a prospect is his college or junior side rather than
+   * the NHL team holding his rights. `flag` stands in for a club we carry no crest for — nearly
+   * always European — and is sent by the API so the league-to-country table lives in one place.
+   */
+  club?: { name: string; logo?: string; league?: string; flag?: string };
 };

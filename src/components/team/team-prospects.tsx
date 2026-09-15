@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
+import { TeamLogo } from '@/components/team-logo';
 import { playerRouteId } from '@/lib/player';
 import { fetchTeamOrg } from '@/lib/team';
 import type { OrgPlayer } from '@/lib/team-types';
@@ -39,9 +40,22 @@ function ProspectRow({ p }: { p: OrgPlayer }) {
     <>
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{p.name}</Text>
-        <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>
-          {[p.position, p.age ? `${p.age}y` : '', draft, p.lastTeamName].filter(Boolean).join(' · ')}
-        </Text>
+        {/* The club he plays for, with its mark — the crest where we carry one, its country's flag
+            otherwise. A Swedish flag beside HV71 says the true thing we know about a club whose logo
+            we do not have; the name alone left every European side looking like missing data. */}
+        <View style={styles.meta}>
+          <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>
+            {[p.position, p.age ? `${p.age}y` : '', draft].filter(Boolean).join(' · ')}
+          </Text>
+          {p.lastTeamName ? (
+            <>
+              <Text style={{ color: t.sub, fontSize: 12 }}>·</Text>
+              {p.lastTeamLogo ? <TeamLogo uri={p.lastTeamLogo} size={14} />
+                : p.lastTeamFlag ? <Text style={{ fontSize: 11 }}>{p.lastTeamFlag}</Text> : null}
+              <Text style={{ color: t.sub, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{p.lastTeamName}</Text>
+            </>
+          ) : null}
+        </View>
       </View>
       <Text style={{ color: p.signed ? t.text : t.subtle, fontSize: 12, fontWeight: '600', textAlign: 'right', maxWidth: 120 }} numberOfLines={1}>{contract}</Text>
     </>
@@ -55,5 +69,6 @@ function ProspectRow({ p }: { p: OrgPlayer }) {
 }
 
 const styles = StyleSheet.create({
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
 });

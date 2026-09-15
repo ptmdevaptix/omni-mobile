@@ -113,19 +113,36 @@ function TeamResult({ team }: { team: TeamDirectoryEntry }) {
 }
 
 /**
- * The club crest, the same mark the team results two rows above use.
+ * The crest of the club he PLAYS for.
  *
  * A headshot loses to a crest at this size: every one is a head, centred, cropped identically, in a
  * jersey too small to read, so six of them tell you nothing while six crests tell you at a glance who
  * each player belongs to. The API sends `headshot: ""` for exactly that reason.
  *
- * No club but an NHL player gets the league's own shield: an unsigned free agent belongs to nobody,
- * and initials read as "we have no idea who this is" where the shield says "NHL, no club" — the fact
- * that changes the day he signs. NHL tier only; a junior wearing an NHL shield would be claiming
- * something untrue, so he gets his initials.
+ * Not the club that holds his rights: a Boston College crest beside a Bruins prospect is the fact a
+ * reader is looking for. A club we carry no logo for shows its country's flag — HV71 is Swedish, and
+ * a flag says that where a blank says nothing.
+ *
+ * Falling back: an NHL-tier player with no resolved club gets the league's own shield, because an
+ * unsigned free agent belongs to nobody and "NHL, no club" is the actual fact. A junior wearing an
+ * NHL shield would claim something untrue, so he gets his initials.
  */
-function PlayerCrest({ name, teamAbbrev, league, size = 30 }: { name: string; teamAbbrev?: string; league?: string | null; size?: number }) {
+function PlayerCrest({ name, club, teamAbbrev, league, size = 30 }: {
+  name: string;
+  club?: PlayerSearchResult['club'];
+  teamAbbrev?: string;
+  league?: string | null;
+  size?: number;
+}) {
   const t = useTheme();
+  if (club?.logo) return <TeamLogo uri={club.logo} size={size} />;
+  if (club?.flag) {
+    return (
+      <View style={[styles.avatar, { width: size, height: size }]}>
+        <Text style={{ fontSize: size * 0.62 }}>{club.flag}</Text>
+      </View>
+    );
+  }
   const abbr = (teamAbbrev || (league === 'NHL' ? 'NHL' : '')).trim().toUpperCase();
   if (abbr) {
     const svg = (variant: string) => `https://assets.nhle.com/logos/nhl/svg/${abbr}_${variant}.svg`;
@@ -150,7 +167,7 @@ function PlayerResult({ player }: { player: PlayerSearchResult }) {
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
       <Link href={{ pathname: '/players/[playerId]', params: { playerId: pid } }} asChild>
         <Pressable style={styles.main}>
-          <PlayerCrest name={player.name} teamAbbrev={player.teamAbbrev} league={player.league} />
+          <PlayerCrest name={player.name} club={player.club} teamAbbrev={player.teamAbbrev} league={player.league} />
           {/* Position and number sit against the name because they qualify IT — this is what tells
               one Jack Smith from another when the names and the crests both match. The name shrinks
               first: a clipped surname is still recognisable, half a number is not. */}

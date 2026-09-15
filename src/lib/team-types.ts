@@ -89,5 +89,7 @@ export type OrgPlayer = {
   draftYear?: number; draftOverall?: number; draftRound?: number; undrafted?: boolean;
   signed: boolean; aavLabel?: string; contractEndYear?: number;
   nhlId?: string; lastTeamName?: string; lastTeamLeague?: string;
+  // The club he plays for, as a mark: its crest where we carry one, else its country's flag.
+  lastTeamLogo?: string | null; lastTeamFlag?: string;
 };
 export type TeamOrganization = { players: OrgPlayer[]; source?: string; sourceUrl?: string };
