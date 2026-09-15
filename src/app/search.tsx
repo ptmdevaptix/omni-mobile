@@ -163,6 +163,7 @@ function PlayerResult({ player }: { player: PlayerSearchResult }) {
   // The slug IS the player page — /api/player resolves it directly, no nhl- prefix to rebuild.
   const pid = player.slug;
   const qualifier = [player.pos || null, player.number != null ? `#${player.number}` : null].filter(Boolean).join(' · ');
+  const clubLeague = player.club?.league || player.league;
   return (
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
       <Link href={{ pathname: '/players/[playerId]', params: { playerId: pid } }} asChild>
@@ -174,9 +175,10 @@ function PlayerResult({ player }: { player: PlayerSearchResult }) {
           <Text style={{ flexShrink: 1, color: t.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{player.name}</Text>
           {qualifier ? <Text style={{ color: t.sub, fontSize: 12 }}>{qualifier}</Text> : null}
           <View style={{ flex: 1 }} />
-          {/* The league, not the club: it is what the ranking sorted on, so showing it is what makes
-              the order look deliberate rather than arbitrary. */}
-          {player.league ? <Text style={{ color: t.sub, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 }}>{player.league.toUpperCase()}</Text> : null}
+          {/* The league he PLAYS in, which for a prospect is not the league that holds his rights.
+              `league` is the tier the ranking sorted on — NHL for anyone an NHL club owns — and beside
+              a Hamilton crest it read as a contradiction. The club's own league agrees with the mark. */}
+          {clubLeague ? <Text style={{ color: t.sub, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 }} numberOfLines={1}>{clubLeague.toUpperCase()}</Text> : null}
         </Pressable>
       </Link>
       <StarButton on={isFavoritePlayer(pid)} onPress={() => togglePlayer(pid)} />

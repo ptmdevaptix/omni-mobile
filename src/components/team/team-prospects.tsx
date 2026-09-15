@@ -31,6 +31,24 @@ export function TeamProspects({ teamId }: { teamId: string }) {
   );
 }
 
+/**
+ * The club he plays for: its crest where we carry one, its country's flag otherwise.
+ *
+ * A Swedish flag beside HV71 says the true thing we know about a club whose logo we do not have.
+ * The fixed box keeps every name on the same left edge whether or not the mark resolved — a row that
+ * shifts because a crest is missing reads as broken.
+ */
+function ClubMark({ logo, flag }: { logo?: string | null; flag?: string }) {
+  if (logo) return <TeamLogo uri={logo} size={MARK} />;
+  return (
+    <View style={styles.mark}>
+      {flag ? <Text style={{ fontSize: MARK * 0.8 }}>{flag}</Text> : null}
+    </View>
+  );
+}
+
+const MARK = 26;
+
 function ProspectRow({ p }: { p: OrgPlayer }) {
   const t = useTheme();
   const routeId = playerRouteId(p.nhlId);
@@ -38,24 +56,15 @@ function ProspectRow({ p }: { p: OrgPlayer }) {
   const contract = p.signed ? [p.aavLabel, p.contractEndYear ? `→ ${p.contractEndYear}` : ''].filter(Boolean).join(' ') : 'Unsigned';
   const body = (
     <>
+      {/* The club's mark leads the row, at the scale a crest needs to be recognised — that is the
+          whole value of it, and at 14px inline it was a smudge. The second line then carries the
+          club's NAME alone: the mark and the name said the same thing twice, on top of each other. */}
+      <ClubMark logo={p.lastTeamLogo} flag={p.lastTeamFlag} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{p.name}</Text>
-        {/* The club he plays for, with its mark — the crest where we carry one, its country's flag
-            otherwise. A Swedish flag beside HV71 says the true thing we know about a club whose logo
-            we do not have; the name alone left every European side looking like missing data. */}
-        <View style={styles.meta}>
-          <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>
-            {[p.position, p.age ? `${p.age}y` : '', draft].filter(Boolean).join(' · ')}
-          </Text>
-          {p.lastTeamName ? (
-            <>
-              <Text style={{ color: t.sub, fontSize: 12 }}>·</Text>
-              {p.lastTeamLogo ? <TeamLogo uri={p.lastTeamLogo} size={14} />
-                : p.lastTeamFlag ? <Text style={{ fontSize: 11 }}>{p.lastTeamFlag}</Text> : null}
-              <Text style={{ color: t.sub, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{p.lastTeamName}</Text>
-            </>
-          ) : null}
-        </View>
+        <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>
+          {[p.position, p.age ? `${p.age}y` : '', draft, p.lastTeamName].filter(Boolean).join(' · ')}
+        </Text>
       </View>
       <Text style={{ color: p.signed ? t.text : t.subtle, fontSize: 12, fontWeight: '600', textAlign: 'right', maxWidth: 120 }} numberOfLines={1}>{contract}</Text>
     </>
@@ -69,6 +78,6 @@ function ProspectRow({ p }: { p: OrgPlayer }) {
 }
 
 const styles = StyleSheet.create({
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  mark: { width: MARK, height: MARK, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
 });
