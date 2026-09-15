@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { useMemo, useRef } from 'react';
 import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
-import { FollowingPanel } from '@/components/following-panel';
 import { GameCard } from '@/components/game-card';
 import { KeyDateBanner } from '@/components/key-date-banner';
 import { MyTeamsBar } from '@/components/my-teams-bar';
@@ -56,8 +56,10 @@ export default function HomeScreen() {
   const { compact } = useCompact();
   const today = dayKey();
   const listRef = useRef<SectionList<Row, RowSection>>(null);
-  // The Following panel is the list footer; both nudges scroll there.
-  const goToFollowing = () => listRef.current?.getScrollResponder()?.scrollToEnd({ animated: true });
+  // The Following controls are their own screen now — see src/app/following.tsx. They used to be this
+  // list's footer and this scrolled to them, which stopped being reasonable once the panel grew to
+  // fourteen leagues across six groups.
+  const goToFollowing = () => router.push('/following' as never);
 
   const q = useQuery({
     queryKey: ['all-scores', today],
@@ -193,7 +195,6 @@ export default function HomeScreen() {
                 ? <StateView kind="loading" />
                 : <StateView kind="offseason" title="Nothing on today" message="Your leagues and teams have no games today." />
           }
-          ListFooterComponent={<FollowingPanel />}
           renderSectionHeader={({ section }) => (
             <SectionHeader
               title={section.title}
