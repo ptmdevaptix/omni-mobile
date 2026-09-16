@@ -143,7 +143,10 @@ function PlayerCrest({ name, club, teamAbbrev, league, size = 30 }: {
       </View>
     );
   }
-  const abbr = (teamAbbrev || (league === 'NHL' ? 'NHL' : '')).trim().toUpperCase();
+  // Only when NO club resolved. Once one has, the crest of the club that holds his rights would put
+  // an NHL mark beside a junior again — the thing this row exists to stop. A club we know but cannot
+  // draw gets his initials.
+  const abbr = (club ? '' : (teamAbbrev || (league === 'NHL' ? 'NHL' : ''))).trim().toUpperCase();
   if (abbr) {
     const svg = (variant: string) => `https://assets.nhle.com/logos/nhl/svg/${abbr}_${variant}.svg`;
     return <TeamLogo uri={svg('light')} darkUri={svg('dark')} size={size} />;
