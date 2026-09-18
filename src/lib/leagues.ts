@@ -68,7 +68,7 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   ahl:  { bg: ['#f7f1e6', '#2b1d08'], card: ['#eee3cf', '#160f04'], pill: ['#9a6a12', '#e6ab3e'] }, // amber
   chl:  { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red
   ncaa: { bg: ['#eaeef8', '#111f42'], card: ['#dae2f4', '#0a1024'], pill: ['#2a4a9c', '#6a97ff'] }, // blue
-  ushl: { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }, // green
+  ushl: { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#14603a', '#2f9e5a'] }, // green
   // The six Canadian Jr A leagues share one tint, as OHL/WHL/QMJHL share the CHL's: the color
   // encodes the BLOCK, and six hues would imply six unrelated competitions. The CHL's own red, since
   // Sep 2026: all of it is Canadian junior hockey, one tier by color, and merging early (before the
@@ -77,9 +77,9 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   // Europe — teal, shared by the SHL, Liiga and the Czech Extraliga (all on web as of Sep 2026; not
   // yet in this app). The light pill is kept brighter than the others: at their depth it drifted
   // toward both NCAA's blue and USHL's green.
-  shl:   { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
-  liiga: { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
-  elh:   { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
+  shl:   { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#1fb3a7', '#66efe3'] }, // teal
+  liiga: { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#1fb3a7', '#66efe3'] }, // teal
+  elh:   { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#1fb3a7', '#66efe3'] }, // teal
 };
 // The ECHL shares the AHL's colour, as on the web: what the colour encodes is the tier, and both are
 // North American minor pro. Two near-identical hues would imply a distinction that isn't there.
