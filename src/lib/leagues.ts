@@ -315,15 +315,15 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 // "MC" ahead of the CHL block during the Memorial Cup — a stopgap pseudo-league that belongs in the
 // planned events model, so it's deliberately absent here).
 //
-// Only NCAA and the CHL block swap on region: US users see NCAA first, everyone else sees CHL first.
-// USHL is last in BOTH — despite being a US league, Canadian junior is followed more in the US than
-// the USHL is. Region detection is best-effort — see ./region.
-// West to east, and last in both regions — matching CJRA_SUB_LEAGUES in the web's lib/league-order.ts.
+// The Canadian junior leagues travel together (CHL then CJRA — they share a color) and so do the
+// American pair (NCAA then USHL); the two pairs swap on region: US users see NCAA/USHL first, everyone
+// else sees CHL/CJRA first. Region detection is best-effort — see ./region.
+// West to east — matching CJRA_SUB_LEAGUES in the web's lib/league-order.ts.
 const CJRA_ORDER = ["BCHL", "AJHL", "SJHL", "MJHL", "OJHL", "CCHL"] as const;
 
 const LEAGUE_ORDER: Record<Region, readonly string[]> = {
-  US: ["NHL", "AHL", "ECHL", "NCAA", "OHL", "WHL", "QMJHL", "USHL", ...CJRA_ORDER],
-  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", "NCAA", "USHL", ...CJRA_ORDER],
+  US: ["NHL", "AHL", "ECHL", "NCAA", "USHL", "OHL", "WHL", "QMJHL", ...CJRA_ORDER, "SHL"],
+  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", ...CJRA_ORDER, "NCAA", "USHL", "SHL"],
 };
 
 // Section order for the Home hub, by the device's region.
