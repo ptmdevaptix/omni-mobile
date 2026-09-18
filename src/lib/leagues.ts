@@ -74,9 +74,11 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   // Sep 2026: all of it is Canadian junior hockey, one tier by color, and merging early (before the
   // purple it had for a week became a habit) keeps a hue free for leagues still to come.
   cjra: { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red, with the CHL
-  // Europe — teal (the SHL on web as of Sep 2026; not yet in this app). The light pill is kept brighter
-  // than the others: at their depth it drifted toward both NCAA's blue and USHL's green.
-  shl:  { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
+  // Europe — teal, shared by the SHL and Liiga (both on web as of Sep 2026; not yet in this app). The
+  // light pill is kept brighter than the others: at their depth it drifted toward both NCAA's blue
+  // and USHL's green.
+  shl:   { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
+  liiga: { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
 };
 // The ECHL shares the AHL's colour, as on the web: what the colour encodes is the tier, and both are
 // North American minor pro. Two near-identical hues would imply a distinction that isn't there.
@@ -322,8 +324,8 @@ export async function fetchNcaaStandings(): Promise<NcaaConferenceGroup[]> {
 const CJRA_ORDER = ["BCHL", "AJHL", "SJHL", "MJHL", "OJHL", "CCHL"] as const;
 
 const LEAGUE_ORDER: Record<Region, readonly string[]> = {
-  US: ["NHL", "AHL", "ECHL", "NCAA", "USHL", "OHL", "WHL", "QMJHL", ...CJRA_ORDER, "SHL"],
-  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", ...CJRA_ORDER, "NCAA", "USHL", "SHL"],
+  US: ["NHL", "AHL", "ECHL", "NCAA", "USHL", "OHL", "WHL", "QMJHL", ...CJRA_ORDER, "SHL", "LIIGA"],
+  INTL: ["NHL", "AHL", "ECHL", "OHL", "WHL", "QMJHL", ...CJRA_ORDER, "NCAA", "USHL", "SHL", "LIIGA"],
 };
 
 // Section order for the Home hub, by the device's region.
