@@ -69,11 +69,14 @@ const LEAGUE_TINTS: Record<string, LeagueTint> = {
   chl:  { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red
   ncaa: { bg: ['#eaeef8', '#111f42'], card: ['#dae2f4', '#0a1024'], pill: ['#2a4a9c', '#6a97ff'] }, // blue
   ushl: { bg: ['#eaf4ec', '#0c2a19'], card: ['#d8ebdd', '#08160e'], pill: ['#1f7a45', '#46cc7e'] }, // green
-  // The six Canadian Jr A leagues share one tint, as OHL/WHL/QMJHL share the CHL's: the colour
-  // encodes the BLOCK, and six hues would imply six unrelated competitions. Purple because every
-  // other hue is spoken for — grey NHL, amber AHL/ECHL, red CHL, blue NCAA, green USHL.
-  cjra: { bg: ['#f1ecf8', '#1e1430'], card: ['#e5dbf2', '#120b1d'], pill: ['#6b3fa0', '#a684e0'] }, // purple
-  // NB green was previously reserved for a future Euro group; USHL took it. Pick a new hue for Euro.
+  // The six Canadian Jr A leagues share one tint, as OHL/WHL/QMJHL share the CHL's: the color
+  // encodes the BLOCK, and six hues would imply six unrelated competitions. The CHL's own red, since
+  // Sep 2026: all of it is Canadian junior hockey, one tier by color, and merging early (before the
+  // purple it had for a week became a habit) keeps a hue free for leagues still to come.
+  cjra: { bg: ['#f8ecec', '#301113'], card: ['#f0dada', '#190a0b'], pill: ['#a82a30', '#f26a70'] }, // red, with the CHL
+  // Europe — teal (the SHL on web as of Sep 2026; not yet in this app). The light pill is kept brighter
+  // than the others: at their depth it drifted toward both NCAA's blue and USHL's green.
+  shl:  { bg: ['#e8f5f3', '#0c2a27'], card: ['#d4ece8', '#081615'], pill: ['#159c92', '#45dfd0'] }, // teal
 };
 // The ECHL shares the AHL's colour, as on the web: what the colour encodes is the tier, and both are
 // North American minor pro. Two near-identical hues would imply a distinction that isn't there.
