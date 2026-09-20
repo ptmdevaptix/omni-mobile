@@ -11,7 +11,9 @@ import type { ScoreGame, ScoreTeam } from './types';
 
 /**
  * Every id a favorite can appear under on a scoreboard. Favorites hold the canonical /teams id
- * ("chl-ohl-7", "chl-lhjmq-2"); the CHL scoreboard keys teams by LEAGUE code ("ohl-7", "qmjhl-2").
+ * ("chl-ohl-7", "chl-lhjmq-2", "cjra-ojhl-21"); the CHL and Jr A scoreboards key teams by LEAGUE
+ * code ("ohl-7", "qmjhl-2", "ojhl-21"). Mirrors matchIdsForTeam in the web repo — a favorite this
+ * misses never reaches Favorites and its next-game card doubles the live one.
  */
 export function favMatchIds(favorites: readonly string[]): Set<string> {
   const set = new Set<string>();
@@ -22,6 +24,7 @@ export function favMatchIds(favorites: readonly string[]): Set<string> {
       set.add(rest);
       if (rest.startsWith('lhjmq-')) set.add(`qmjhl-${rest.slice(6)}`);
     }
+    if (id.startsWith('cjra-')) set.add(id.slice(5));
   }
   return set;
 }
