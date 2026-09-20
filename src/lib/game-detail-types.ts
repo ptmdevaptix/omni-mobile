@@ -19,11 +19,14 @@ export type ThreeStar = { star: number; name: string; teamAbbr: string; goals: n
 // Box-score player rows (from the game-detail `rosters`).
 export type BoxSkater = {
   playerId: number; name: string; number?: number;
+  playerSlug?: string; // the player-page route id, when the API linked the row
+
   goals?: number; assists?: number; plusMinus?: number; pim?: number; toi?: string;
   sog?: number; // shots on goal — CHL feeds only today, so the column is conditional
 };
 export type BoxGoalie = {
   playerId: number; name: string; number?: number;
+  playerSlug?: string;
   pim?: number; toi?: string; shotsAgainst?: number; saves?: number; goalsAgainst?: number;
 };
 export type TeamBox = { forwards: BoxSkater[]; defense: BoxSkater[]; goalies: BoxGoalie[] };

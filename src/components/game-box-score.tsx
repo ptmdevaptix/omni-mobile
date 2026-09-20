@@ -27,6 +27,8 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
   const [side, setSide] = useState<'away' | 'home'>('away');
   const rosters = g.rosters;
   if (!rosters) return null;
+  // The API links each row by its stored slug for every league it has seeded; the NHL id is the
+  // fallback for a player the nightly refresh has not minted yet.
   const nhl = (g.league || '').toUpperCase() === 'NHL';
   const box = side === 'away' ? rosters.away : rosters.home;
   const hasToi = [...box.forwards, ...box.defense].some((p) => p.toi);
@@ -69,7 +71,7 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
           <View key={gr.label}>
             <Text style={[styles.group, { color: t.subtle }]}>{gr.label.toUpperCase()}</Text>
             {gr.players.map((p) => (
-              <BoxRow key={p.playerId} routeId={nhl ? playerRouteId(p.playerId) : null}>
+              <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)}>
                 <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
                 <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{fitName(p.name)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.goals)}</Text>
@@ -97,7 +99,7 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
             <Text style={[styles.toi, { color: t.sub }]}>TOI</Text>
           </View>
           {goalies.map((p: BoxGoalie) => (
-            <BoxRow key={p.playerId} routeId={nhl ? playerRouteId(p.playerId) : null}>
+            <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)}>
               <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
               <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{fitName(p.name)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.shotsAgainst)}</Text>
