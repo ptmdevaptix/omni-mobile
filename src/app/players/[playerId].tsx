@@ -182,7 +182,8 @@ function BioCard({ p }: { p: PlayerDetail }) {
     ['Born', born || undefined],
     // birthplace already ends in the country ("Calgary, AB, CAN"), so appending birthCountry gave
     // "Calgary, AB, CAN, CAN". The country alone is the fallback for players we have no city for.
-    ['Birthplace', p.birthplace || p.birthCountry || undefined],
+    // The word is the honest one: sources record a birthplace or a hometown without saying which.
+    ['Hometown', p.birthplace || p.birthCountry || undefined],
     ['Draft', draft],
     /**
      * Who HOLDS him, when that is not who he plays for.
