@@ -20,7 +20,13 @@ export type PlayerSeasonStatRow = PlayerStatLine & {
   teamHref?: string | null;
 };
 
-export type PlayerDraft = { year?: number; teamAbbrev?: string; round?: number; overallPick?: number };
+export type PlayerDraft = {
+  year?: number; teamAbbrev?: string; round?: number; pickInRound?: number; overallPick?: number;
+  /** The league that ran the draft — "OHL", "WHL" — so a junior draft is not read as the NHL's. */
+  league?: string;
+  /** The drafting club's crest, for the leagues whose clubs are not on the NHL's CDN. */
+  teamLogo?: string;
+};
 
 /** One season of a deal, as cap-space publishes it: its own cap hit, and its own clause. */
 export type ContractSeason = { startYear: number; capHit: number; clause?: string };
@@ -80,6 +86,8 @@ export type PlayerDetail = {
   draft?: PlayerDraft;
   /** False when nobody has told us whether he was drafted — not the same as "undrafted". */
   draftStatusKnown?: boolean;
+  /** The club's colours, where we hold them — {primary, secondary}. */
+  teamColors?: { primary?: string; secondary?: string };
   currentSeason?: PlayerStatLine;
   careerTotals?: PlayerStatLine;
   seasonTotals: PlayerSeasonStatRow[];

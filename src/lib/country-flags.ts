@@ -31,6 +31,26 @@ const PROVINCE_COUNTRY: Record<string, string> = Object.fromEntries([
     .map((s) => [s, '🇺🇸']),
 ]);
 
+/**
+ * The country a league belongs to, for the clubs we have no crest for. Mirrors lib/league-country.ts
+ * on the web: only leagues whose clubs are all in ONE country — the NHL and the AHL span two, so a
+ * flag would be wrong for them, and they are also the leagues whose crests we already have.
+ */
+const LEAGUE_COUNTRY: Record<string, string> = {
+  SHL: 'SWE', HOCKEYALLSVENSKAN: 'SWE', ALLSVENSKAN: 'SWE', HOCKEYETTAN: 'SWE',
+  LIIGA: 'FIN', MESTIS: 'FIN',
+  KHL: 'RUS', VHL: 'RUS', MHL: 'RUS',
+  DEL: 'DEU', DEL2: 'DEU',
+  NL: 'CHE', SL: 'CHE', 'NATIONAL LEAGUE': 'CHE', 'SWISS LEAGUE': 'CHE',
+  EXTRALIGA: 'CZE', ELH: 'CZE', CHANCE: 'CZE',
+  TIPOS: 'SVK', ICEHL: 'AUT', METAL: 'DNK', EIHL: 'GBR',
+};
+
+/** ISO country code for a league, or undefined when it spans more than one. */
+export function leagueCountry(league?: string | null): string | undefined {
+  return LEAGUE_COUNTRY[(league ?? '').trim().toUpperCase()];
+}
+
 /** A flag for a country code or name, else from the hometown's last part ("Pickering, ON" → Canada). */
 export function countryFlag(country?: string | null, birthplace?: string | null): string | undefined {
   if (country) {

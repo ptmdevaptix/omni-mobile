@@ -3,14 +3,15 @@ import { Image } from 'expo-image';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { canSlide, ContractTimeline, contractPlayedOut, contractTimeline, nhlGamesForSlide } from '@/components/contract-timeline';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
+import { countryFlag, leagueCountry } from '@/lib/country-flags';
 import { useFavorites } from '@/lib/favorites';
 import { canonicalPlayerKey, fetchPlayer, seasonLabel } from '@/lib/player';
-import type { PlayerContract, PlayerDetail, PlayerSeasonStatRow, PlayerStatLine } from '@/lib/player-types';
+import type { PlayerContract, PlayerDetail, PlayerDraft, PlayerSeasonStatRow, PlayerStatLine } from '@/lib/player-types';
 import { useTheme } from '@/lib/theme';
 
 export default function PlayerScreen() {
@@ -29,7 +30,11 @@ export default function PlayerScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
           <Hero p={p} />
-          {p.currentSeason ? <SeasonCard title="Current Season" line={p.currentSeason} goalie={p.isGoalie} /> : null}
+          {/* Named by the season it actually holds. "Current Season" over a line from 2023-24 —
+              which is what a player who left the NHL still has — claimed it was this year's. */}
+          {p.currentSeason ? (
+            <SeasonCard title={p.currentSeason.season ? `${seasonLabel(p.currentSeason.season)} Season` : 'Latest Season'} line={p.currentSeason} goalie={p.isGoalie} />
+          ) : null}
           <BioCard p={p} />
           <ContractCard p={p} />
           {/* `primaryLeague`, not `league`: the API says "nhl" for every roster-only player as a
@@ -54,6 +59,15 @@ function Hero({ p }: { p: PlayerDetail }) {
   }, [loaded, legacy, key, isFavoritePlayer, renamePlayer]);
   const on = isFavoritePlayer(key) || (!!legacy && isFavoritePlayer(legacy));
   const teamId = p.teamHref?.startsWith('/teams/') ? p.teamHref.slice('/teams/'.length) : undefined;
+  // A club we carry no crest for — nearly always European — wears its country's flag instead of an
+  // empty box. The league is the one thing we do know about it, and a league sits in a country.
+  const clubFlag = !p.teamLogo ? countryFlag(leagueCountry(p.teamLeague)) : undefined;
+  /**
+   * "Inactive" is the NHL's word about its own league, and it is false of a player who left for
+   * another one: Radim Zohorna reads inactive while playing in the SHL. So it is shown only when
+   * nothing else says he is playing — no club, and no roster this season.
+   */
+  const inactive = p.isActive === false && !p.teamName && p.clubCurrent !== true;
   return (
     <View style={styles.hero}>
       {p.headshot ? <Image source={{ uri: p.headshot }} style={styles.headshot} contentFit="cover" /> : <View style={[styles.headshot, { backgroundColor: t.card }]} />}
@@ -83,16 +97,26 @@ function Hero({ p }: { p: PlayerDetail }) {
           teamId ? (
             <Link href={{ pathname: '/teams/[teamId]', params: { teamId } }} asChild>
               <Pressable style={styles.clubRow}>
-                <TeamLogo uri={p.teamLogo} size={20} />
+                {clubFlag ? <Text style={{ fontSize: 16 }}>{clubFlag}</Text> : <TeamLogo uri={p.teamLogo} size={20} />}
                 <Text style={{ color: t.accent, fontSize: 14, fontWeight: '600' }}>{p.teamName}</Text>
               </Pressable>
             </Link>
           ) : (
             <View style={styles.clubRow}>
-              <TeamLogo uri={p.teamLogo} size={20} />
+              {clubFlag ? <Text style={{ fontSize: 16 }}>{clubFlag}</Text> : <TeamLogo uri={p.teamLogo} size={20} />}
               <Text style={{ color: t.sub, fontSize: 14, fontWeight: '600' }}>{p.teamName}</Text>
             </View>
           )
+        ) : null}
+        {/* The club is only the last one we know of — he is on no roster we track this season. Said
+            plainly, because the line above otherwise reads as where he plays now. */}
+        {p.clubCurrent === false ? (
+          <Text style={{ color: t.subtle, fontSize: 11, marginTop: 3 }} numberOfLines={2}>
+            Last known club{p.clubSeason ? ` · ${p.clubSeason}` : ''} — not on a roster we track this season
+          </Text>
+        ) : null}
+        {inactive ? (
+          <View style={[styles.pill, { borderColor: t.border }]}><Text style={{ color: t.sub, fontSize: 10, fontWeight: '700' }}>INACTIVE</Text></View>
         ) : null}
       </View>
       <Pressable onPress={() => togglePlayer(key)} hitSlop={10} accessibilityLabel={on ? 'Remove favorite' : 'Add favorite'}>
@@ -172,13 +196,27 @@ function fmtBirthDate(dateStr?: string): string {
   return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** A bio row: label, value, and — for the draft — a crest and a label of its own. */
+type BioRow = [string, string | undefined, { logo?: string; label?: string }?];
+
+/**
+ * The draft, as it is said: "2015 · EDM · Rd 1, #1".
+ *
+ * The round matters — a first-rounder and a seventh-rounder are different facts about a player, and
+ * the overall pick alone does not say which without counting. The league that ran the draft is named
+ * by the row's own label, so an OHL draft is not read as the NHL's.
+ */
+function draftText(d?: PlayerDraft): string | null {
+  if (!d?.year) return null;
+  const pick = d.round ? `Rd ${d.round}${d.overallPick ? `, #${d.overallPick}` : ''}` : d.overallPick ? `#${d.overallPick}` : '';
+  return [String(d.year), d.teamAbbrev, pick].filter(Boolean).join(' · ');
+}
+
 function BioCard({ p }: { p: PlayerDetail }) {
   const t = useTheme();
   const timeline = p.contract ? contractTimeline(p.contract) : null;
   const born = [fmtBirthDate(p.birthDate), p.age != null ? `(${p.age})` : null].filter(Boolean).join(' ');
-  const draftLabel = p.draft?.year
-    ? `${p.draft.year}${p.draft.teamAbbrev ? ` · ${p.draft.teamAbbrev}` : ''}${p.draft.overallPick ? ` · #${p.draft.overallPick}` : ''}`
-    : null;
+  const draftLabel = draftText(p.draft);
   /**
    * "Undrafted" only when we actually know he went undrafted.
    *
@@ -188,13 +226,22 @@ function BioCard({ p }: { p: PlayerDetail }) {
    * about our data — and on a junior roster nearly everyone is in that state.
    */
   const draft = draftLabel ?? (p.draftStatusKnown === false ? undefined : 'Undrafted');
-  const rows: [string, string | undefined][] = [
+  /**
+    * Who HOLDS him, when that is not who he plays for.
+    *
+    * Not "the abbreviations differ": a Seattle prospect on the Thunderbirds and the Kraken's own
+    * player both read SEA against SEA. The question is whether he is on that NHL club's roster now,
+    * which is what the club's league answers.
+    */
+  const onThatNhlRoster = p.teamLeague === 'NHL' && !!p.nhlTeam && p.teamAbbrev === p.nhlTeam;
+  const rows: BioRow[] = [
     ['Born', born || undefined],
     // birthplace already ends in the country ("Calgary, AB, CAN"), so appending birthCountry gave
     // "Calgary, AB, CAN, CAN". The country alone is the fallback for players we have no city for.
     // The word is the honest one: sources record a birthplace or a hometown without saying which.
     ['Hometown', p.birthplace || p.birthCountry || undefined],
-    ['Draft', draft],
+    // The league that ran it, and the drafting club's crest beside the pick.
+    ['Draft', draft, p.draft?.year ? { logo: p.draft.teamLogo, label: p.draft.league && p.draft.league !== 'NHL' ? `${p.draft.league} Draft` : undefined } : undefined],
     /**
      * Who HOLDS him, when that is not who he plays for.
      *
@@ -204,8 +251,8 @@ function BioCard({ p }: { p: PlayerDetail }) {
      * above it. (The web puts this as a crest beside the name; a labelled row is the version that
      * needs no decoding.)
      */
-    ...(p.nhlTeam && p.nhlTeam !== p.teamAbbrev
-      ? [['NHL rights', p.nhlTeam] as [string, string]]
+    ...(p.nhlTeam && !onThatNhlRoster
+      ? [['NHL rights', p.nhlTeam] as BioRow]
       : []),
     /**
      * Only a FREE AGENT's status belongs here.
@@ -218,8 +265,11 @@ function BioCard({ p }: { p: PlayerDetail }) {
      * "Signed, expiry unknown" is deliberately NOT a free agent: that is a contract we failed to
      * read, and it goes to the contract section as a sentence.
      */
+    // "NHL status" where he plays somewhere else: cap-space is describing NHL contracts, and a bare
+    // "Status: Unrestricted Free Agent" reads as "belongs to nobody" for a man under contract in
+    // Sweden.
     ...(p.contract && isFreeAgent(p.contract)
-      ? [['Status', contractStatusLabel(p.contract)] as [string, string]]
+      ? [[p.teamName && p.teamLeague && p.teamLeague !== 'NHL' ? 'NHL status' : 'Status', contractStatusLabel(p.contract)] as BioRow]
       : []),
   ];
 
@@ -231,10 +281,13 @@ function BioCard({ p }: { p: PlayerDetail }) {
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
       <Text style={[styles.section, { color: t.sub }]}>PLAYER INFO</Text>
-      {shown.map(([label, val]) => (
+      {shown.map(([label, val, extra]) => (
         <View key={label} style={styles.bioRow}>
-          <Text style={{ color: t.sub, fontSize: 14 }}>{label}</Text>
-          <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>{val}</Text>
+          <Text style={{ color: t.sub, fontSize: 14 }}>{extra?.label ?? label}</Text>
+          <View style={styles.bioValue}>
+            {extra?.logo ? <TeamLogo uri={extra.logo} size={16} /> : null}
+            <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{val}</Text>
+          </View>
         </View>
       ))}
     </View>
@@ -277,7 +330,14 @@ function ContractCard({ p }: { p: PlayerDetail }) {
           Slides a year forward if he plays fewer than 10 NHL games this season.
         </Text>
       ) : null}
-      <Text style={{ color: t.subtle, fontSize: 10, marginTop: 10 }}>Contract data via {c.source ?? 'cap-space.com'}</Text>
+      {/* The source, linked where it gives a page — the numbers here are somebody else's reading. */}
+      {c.sourceUrl ? (
+        <Pressable onPress={() => Linking.openURL(c.sourceUrl!)} accessibilityRole="link" hitSlop={6} style={{ marginTop: 10 }}>
+          <Text style={{ color: t.sub, fontSize: 10, textDecorationLine: 'underline' }}>Contract data via {c.source ?? 'cap-space.com'}</Text>
+        </Pressable>
+      ) : (
+        <Text style={{ color: t.subtle, fontSize: 10, marginTop: 10 }}>Contract data via {c.source ?? 'cap-space.com'}</Text>
+      )}
     </View>
   );
 }
@@ -380,9 +440,14 @@ function CareerSection({ rows, goalie, primaryLeague, totals }: {
 function TeamCell({ row }: { row: PlayerSeasonStatRow }) {
   const t = useTheme();
   const label = row.teamAbbrev || row.teamName;
+  // The feed's crest, else the NHL's own for an NHL row, else the country's flag for a league that
+  // sits in one — so the column stays aligned instead of losing its mark every other row.
+  const logo = row.teamLogo
+    ?? (row.leagueAbbrev === 'NHL' && row.teamAbbrev ? `https://assets.nhle.com/logos/nhl/svg/${row.teamAbbrev}_light.svg` : undefined);
+  const flag = !logo ? countryFlag(leagueCountry(row.leagueAbbrev)) : undefined;
   const inner = (
     <View style={styles.cteamInner}>
-      {row.teamLogo ? <TeamLogo uri={row.teamLogo} size={18} /> : null}
+      {logo ? <TeamLogo uri={logo} size={18} /> : flag ? <Text style={{ fontSize: 13, width: 18 }}>{flag}</Text> : <View style={{ width: 18 }} />}
       <Text style={{ flexShrink: 1, color: t.text, fontSize: 13 }} numberOfLines={1}>{label}</Text>
     </View>
   );
@@ -424,6 +489,8 @@ function StatCells({ line, goalie, bold }: { line: PlayerStatLine; goalie: boole
 const styles = StyleSheet.create({
   hero: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   clubRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  pill: { alignSelf: 'flex-start', borderWidth: StyleSheet.hairlineWidth, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginTop: 5 },
+  bioValue: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   headshot: { width: 76, height: 76, borderRadius: 38 },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 2 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 8 },
