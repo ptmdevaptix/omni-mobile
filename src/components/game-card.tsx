@@ -167,8 +167,10 @@ function Reason({ items, size }: { items: { label: string; muted: boolean }[]; s
   return (
     <Text style={{ fontSize: size, flexShrink: 1 }} numberOfLines={1}>
       <Text style={{ color: '#f5a623' }}>★ </Text>
+      {/* The accent colour, as the web gives it: this line is why the card is here at all, and in
+          plain grey it read as one more caption. A player who did not dress stays muted. */}
       {shown.map((it, k) => (
-        <Text key={k} style={{ color: it.muted ? t.subtle : t.sub, fontWeight: '600' }} accessibilityLabel={it.muted ? `${it.label}, not dressed` : undefined}>{k > 0 ? ', ' : ''}{it.label}</Text>
+        <Text key={k} style={{ color: it.muted ? t.subtle : t.accent, fontWeight: '600' }} accessibilityLabel={it.muted ? `${it.label}, not dressed` : undefined}>{k > 0 ? ', ' : ''}{it.label}</Text>
       ))}
     </Text>
   );

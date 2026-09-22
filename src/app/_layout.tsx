@@ -40,7 +40,7 @@ function RootNav() {
         <Stack.Screen name="favorites" options={{ title: 'Favorites' }} />
         <Stack.Screen name="following" options={{ title: 'Following' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        <Stack.Screen name="leaders" options={{ title: 'Leaders' }} />
+        <Stack.Screen name="news" options={{ title: 'News' }} />
         <Stack.Screen name="info/[slug]" options={{ title: 'Info' }} />
         <Stack.Screen name="search" options={{ title: 'Search', presentation: 'modal' }} />
       </Stack>

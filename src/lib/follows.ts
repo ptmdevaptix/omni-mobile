@@ -100,7 +100,15 @@ export function buildAffiliateIndex(teams: readonly { id: string; via?: string }
   return map;
 }
 
-const surname = (name: string) => name.trim().split(/\s+/).slice(-1)[0] ?? name;
+/**
+ * "A. Lee" — the initial and the surname. A bare surname is ambiguous on a card ("Misa" is three
+ * players in our own data), and a full name does not fit the one line a card has to spend.
+ */
+function surname(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const last = parts[parts.length - 1] ?? name;
+  return parts.length > 1 && parts[0] ? `${parts[0][0]}. ${last}` : last;
+}
 
 export type FollowReasonItem = {
   label: string;

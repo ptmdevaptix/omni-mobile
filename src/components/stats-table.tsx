@@ -47,25 +47,26 @@ function skaterCols(meta: StatsMeta): Col<SkaterRow>[] {
   return cols;
 }
 
+/**
+ * Goalies, best stat first: GAA and SV% are what a goalie board is FOR, and on a phone a column
+ * that needs a swipe may as well not be there. The web can afford to run the counting stats first
+ * because it shows fifteen columns at once. Wins and the rest follow.
+ */
 function goalieCols(meta: StatsMeta): Col<GoalieRow>[] {
   const cols: Col<GoalieRow>[] = [
     { key: 'gp', label: 'GP', title: 'Games played', get: (r) => r.gp, fmt: (r) => String(r.gp), defaultDesc: true, isRate: false },
-  ];
-  if (meta.hasGs) cols.push({ key: 'gs', label: 'GS', title: 'Games started', get: (r) => r.gs ?? 0, fmt: (r) => String(r.gs ?? 0), defaultDesc: true, isRate: false });
-  cols.push(
-    { key: 'wins', label: 'W', title: 'Wins', get: (r) => r.wins, fmt: (r) => String(r.wins), defaultDesc: true, isRate: false },
-    { key: 'losses', label: 'L', title: 'Losses', get: (r) => r.losses, fmt: (r) => String(r.losses), defaultDesc: false, isRate: false },
-  );
-  if (meta.hasOt) cols.push({ key: 'ot', label: 'OT', title: 'Overtime losses', get: (r) => r.ot ?? 0, fmt: (r) => String(r.ot ?? 0), defaultDesc: false, isRate: false });
-  if (meta.hasGoalieSA) cols.push(
-    { key: 'sa', label: 'SA', title: 'Shots against', get: (r) => r.sa ?? 0, fmt: (r) => String(r.sa ?? 0), defaultDesc: true, isRate: false },
-    { key: 'ga', label: 'GA', title: 'Goals against', get: (r) => r.ga ?? 0, fmt: (r) => String(r.ga ?? 0), defaultDesc: false, isRate: false },
-    { key: 'sv', label: 'SV', title: 'Saves', get: (r) => r.sv ?? 0, fmt: (r) => String(r.sv ?? 0), defaultDesc: true, isRate: false },
-  );
-  cols.push(
     { key: 'gaa', label: 'GAA', title: 'Goals-against average', get: (r) => r.gaa, fmt: (r) => (r.gaa ?? 0).toFixed(2), defaultDesc: false, isRate: true },
     { key: 'svPct', label: 'SV%', title: 'Save percentage', get: (r) => r.svPct, fmt: (r) => pct3(r.svPct), defaultDesc: true, isRate: true },
-    { key: 'so', label: 'SO', title: 'Shutouts', get: (r) => r.so, fmt: (r) => String(r.so), defaultDesc: true, isRate: false },
+    { key: 'wins', label: 'W', title: 'Wins', get: (r) => r.wins, fmt: (r) => String(r.wins), defaultDesc: true, isRate: false },
+    { key: 'losses', label: 'L', title: 'Losses', get: (r) => r.losses, fmt: (r) => String(r.losses), defaultDesc: false, isRate: false },
+  ];
+  if (meta.hasOt) cols.push({ key: 'ot', label: 'OT', title: 'Overtime losses', get: (r) => r.ot ?? 0, fmt: (r) => String(r.ot ?? 0), defaultDesc: false, isRate: false });
+  cols.push({ key: 'so', label: 'SO', title: 'Shutouts', get: (r) => r.so, fmt: (r) => String(r.so), defaultDesc: true, isRate: false });
+  if (meta.hasGs) cols.push({ key: 'gs', label: 'GS', title: 'Games started', get: (r) => r.gs ?? 0, fmt: (r) => String(r.gs ?? 0), defaultDesc: true, isRate: false });
+  if (meta.hasGoalieSA) cols.push(
+    { key: 'sa', label: 'SA', title: 'Shots against', get: (r) => r.sa ?? 0, fmt: (r) => String(r.sa ?? 0), defaultDesc: true, isRate: false },
+    { key: 'sv', label: 'SV', title: 'Saves', get: (r) => r.sv ?? 0, fmt: (r) => String(r.sv ?? 0), defaultDesc: true, isRate: false },
+    { key: 'ga', label: 'GA', title: 'Goals against', get: (r) => r.ga ?? 0, fmt: (r) => String(r.ga ?? 0), defaultDesc: false, isRate: false },
   );
   return cols;
 }
@@ -74,7 +75,18 @@ function goalieCols(meta: StatsMeta): Col<GoalieRow>[] {
 // under it his position, league and club — and the scrolling half is nothing but numbers. That
 // keeps GP · G · A · PTS on screen at 393pt without a swipe, which is what a reader opens a
 // leaderboard for. The web spends its width on Pos, Lg and Team as columns of their own.
-const W = { rank: 30, name: 154, stat: 37 };
+const W = { rank: 22, name: 150, stat: 37 };
+
+/**
+ * A column as wide as the widest thing in it. A goalie with 1,202 shots against wrapped onto two
+ * lines in a cell sized for three digits; measuring means no column is ever too narrow and none is
+ * padded for numbers it will never hold. ~7.5pt a digit at 13px tabular figures, plus the padding.
+ */
+function columnWidth<R>(c: Col<R>, rows: R[]): number {
+  let chars = c.label.length + 1;   // + the sort arrow
+  for (const r of rows) { const n = c.fmt(r).length; if (n > chars) chars = n; }
+  return Math.max(c.width ?? W.stat, Math.round(chars * 7.5) + 10);
+}
 
 /** Full name when it fits, else "C. McDavid" — the same rule the box score's rows use. */
 function fitName(name: string, max = 12): string {
@@ -98,6 +110,7 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
   if (rows !== seen) { setSeen(rows); setShown(PAGE_SIZE); }
 
   const col = cols.find((c) => c.key === sortKey) ?? cols.find((c) => c.key === defaultSort) ?? cols[0];
+  const widths = useMemo(() => new Map(cols.map((c) => [c.key, columnWidth(c, rows)])), [cols, rows]);
   const sorted = useMemo(() => {
     // A rate column counts only the players past the floor — whoever played once and got lucky
     // would otherwise own it.
@@ -115,7 +128,7 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
     const on = c.key === col.key;
     return (
       <Pressable key={c.key} onPress={() => sortBy(c)} accessibilityRole="button" accessibilityLabel={c.title} accessibilityState={{ selected: on }}
-        style={[styles.cell, { width: c.width ?? W.stat }, on && { backgroundColor: `${t.accent}1f` }]}>
+        style={[styles.cell, { width: widths.get(c.key) ?? W.stat }, on && { backgroundColor: `${t.accent}1f` }]}>
         <Text style={[styles.head, { color: on ? t.text : t.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {c.label}{on ? (desc ? '▾' : '▴') : ''}
         </Text>
@@ -125,7 +138,7 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
 
   const nameCell = (r: R, i: number) => (
     <View style={[styles.cell, styles.nameCell, { width: W.name }]}>
-      <Text style={[styles.num, { color: t.subtle, width: 20, textAlign: 'right' }]}>{i + 1}</Text>
+      <Text style={[styles.num, { color: t.subtle, width: W.rank, textAlign: 'right' }]}>{i + 1}</Text>
       <TeamLogo uri={r.teamLogo} darkUri={r.teamDarkLogo} size={18} />
       <View style={{ flexShrink: 1 }}>
         <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{fitName(r.name)}</Text>
@@ -144,7 +157,7 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
         <View style={[styles.frozen, { borderRightColor: t.border }]}>
           <View style={[styles.row, styles.headRow, { borderBottomColor: t.border }]}>
             <View style={[styles.cell, styles.nameCell, { width: W.name }]}>
-              <Text style={[styles.head, { color: t.sub, width: 20, textAlign: 'right' }]}>RK</Text>
+              <Text style={[styles.head, { color: t.sub, width: W.rank, textAlign: 'right' }]}>RK</Text>
               <Text style={[styles.head, { color: t.sub }]}>Player</Text>
             </View>
           </View>
@@ -168,8 +181,8 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
                 {cols.map((c) => {
                   const on = c.key === col.key;
                   return (
-                    <View key={c.key} style={[styles.cell, { width: c.width ?? W.stat }, on && { backgroundColor: `${t.accent}14` }]}>
-                      <Text style={[styles.num, { color: on ? t.text : t.sub, fontWeight: on ? '700' : '400' }]}>{c.fmt(r)}</Text>
+                    <View key={c.key} style={[styles.cell, { width: widths.get(c.key) ?? W.stat }, on && { backgroundColor: `${t.accent}14` }]}>
+                      <Text style={[styles.num, { color: on ? t.text : t.sub, fontWeight: on ? '700' : '400' }]} numberOfLines={1}>{c.fmt(r)}</Text>
                     </View>
                   );
                 })}
@@ -205,8 +218,10 @@ const styles = StyleSheet.create({
   frozen: { borderRightWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, height: 42 },
   headRow: { height: 30 },
-  cell: { paddingHorizontal: 4, justifyContent: 'center' },
-  nameCell: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 6 },
+  cell: { paddingHorizontal: 3, justifyContent: 'center' },
+  // No left padding: the rank column is the card's own edge, so the numbers and the crests below
+  // them line up with the header rather than floating in a margin.
+  nameCell: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 0 },
   head: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', textAlign: 'right' },
   num: { fontSize: 13, textAlign: 'right', fontVariant: ['tabular-nums'] },
   foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
