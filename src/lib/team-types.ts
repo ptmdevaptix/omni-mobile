@@ -13,7 +13,12 @@ export type RosterPlayer = {
   birthplace: string;
   birthCountry?: string;
   headshot?: string;
+  birthDate?: string;
   nhlId?: string;
+  /** The player's canonical page, as STORED on his players row — never derived. Absent when he has no row. */
+  playerSlug?: string;
+  /** The NHL club holding his rights (abbreviation), for the crest beside his name. Rare on a junior roster. */
+  nhlRights?: string;
 };
 export type RosterResponse = {
   forwards: RosterPlayer[];
@@ -71,7 +76,9 @@ export type MiniGame = {
 };
 export type DivTeam = {
   id?: string; abbr: string; name: string; logo: string; darkLogo: string;
-  points: number; gp: number; wins: number; losses: number; otl: number; divisionSequence: number; clinch?: string;
+  points: number; gp: number; wins: number; losses: number; otl: number;
+  /** Overtime and shootout wins, where the league splits them from `wins` (Europe's 3-2-1-0 tables). */
+  otw?: number; divisionSequence: number; clinch?: string;
 };
 export type TeamHomeData = {
   leaders: { goals: Leader[]; assists: Leader[]; points: Leader[]; plusMinus: Leader[]; toi: Leader[] };
@@ -82,6 +89,8 @@ export type TeamHomeData = {
   division: DivTeam[]; divisionName: string;
   playoffStatus?: { positionLabel?: string; playoffSeriesStatus?: string; hidden?: boolean };
   totalTeams: number;
+  /** Rank cut lines for the table's bands ([last playoff, last play-in, last safe]), where a league has them (Europe). */
+  cuts?: number[];
 };
 
 export type OrgPlayer = {

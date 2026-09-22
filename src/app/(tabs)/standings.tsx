@@ -1,21 +1,22 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { LeaguePicker } from '@/components/league-picker';
-import { NhlStandings } from '@/components/nhl-standings';
-import { SegmentedFilter } from '@/components/segmented-filter';
+import { SeasonSelect } from '@/components/season-select';
+import { StandingsCard } from '@/components/standings-card';
 import { StateView } from '@/components/state-view';
-import { TeamLogo } from '@/components/team-logo';
-import { WlotlStandings } from '@/components/wlotl-standings';
-import {
-  blockOf, fetchNcaaStandings, isBlock, leagueById, leagueColors, leaguesIn, useLeague,
-  type LeagueId, type NcaaStandingsTeam, type PickerId,
-} from '@/lib/leagues';
 import { useFollowedLeagues } from '@/lib/followed-leagues';
+import { blockOf, fetchAllTeams, isBlock, leagueColors, leaguesIn, useLeague, type LeagueId, type PickerId } from '@/lib/leagues';
 import { usePullRefresh } from '@/lib/pull-refresh';
+import { buildStandingsGroups, fetchStandingsPayload, standingsNote, standingsViews, VIEW_LABEL, type Grouping } from '@/lib/standings-data';
 import { useTheme } from '@/lib/theme';
+
+// Standings as cards, every league on the one component (components/standings-card) fed by the
+// per-league adapters (lib/standings-data) — the web's standings page, at its phone width.
+
+const ALL_STATS_KEY = 'standingsAllStats';
 
 export default function StandingsScreen() {
   const t = useTheme();
@@ -26,10 +27,6 @@ export default function StandingsScreen() {
    * A block has no standings of its own — there is no all-CHL table — so it resolves to one of its
    * member leagues, and that choice lives HERE rather than in the shared selection. Switching back to
    * Scores still shows the whole block, which is the point of having a block at all.
-   *
-   * The picker renders the choice: passing `value` puts the member row in the pill bar with one
-   * member active, exactly as on the web, instead of a second chip row underneath saying the same
-   * thing twice.
    */
   const members = isBlock(league) ? leaguesIn(league, followed) : [];
   const [member, setMember] = useState<LeagueId | null>(null);
@@ -38,86 +35,105 @@ export default function StandingsScreen() {
     : (league as LeagueId);
 
   const pick = (id: PickerId) => {
-    // A member of the block already showing: narrow the page, leave the shared selection alone.
     if (!isBlock(id) && blockOf(id)?.key === league) { setMember(id as LeagueId); return; }
-    // Re-tapping the block would mean "all of them", which this page cannot draw. Stay put.
     if (id === league) return;
     setMember(null);
     setLeague(id);
   };
 
-  const kind = leagueById(shown).standingsKind;
   const c = leagueColors(shown, t.mode === 'dark');
-
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <LeaguePicker value={members.length ? shown : league} onChange={pick} />
-      {shown === 'nhl' ? <NhlStandings card={c.card} /> : kind === 'ncaa' ? <NcaaStandings card={c.card} /> : <WlotlStandings key={shown} league={shown} card={c.card} />}
+      {/* Keyed on the league so the view, sort and season all open fresh for each one. */}
+      <LeagueStandings key={shown} league={shown} pill={c.pill} />
     </View>
   );
 }
 
-// --- NCAA: grouped by conference (default) or a flat league-wide table -------
-type NcaaView = 'conference' | 'league';
-const ncaaWinPct = (x: NcaaStandingsTeam) => { const g = x.oW + x.oL + x.oT; return g ? (x.oW + x.oT * 0.5) / g : 0; };
+// Remembered per device: the switch used to reset on every remount — a league tab, a season
+// switch — so the full columns seemed to vanish on their own. Read once, written on change.
+function useAllStats(): [boolean, (v: boolean) => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => { AsyncStorage.getItem(ALL_STATS_KEY).then((v) => { if (v === '1') setOn(true); }).catch(() => {}); }, []);
+  const set = (v: boolean) => { setOn(v); AsyncStorage.setItem(ALL_STATS_KEY, v ? '1' : '0').catch(() => {}); };
+  return [on, set];
+}
 
-function NcaaStandings({ card }: { card: string }) {
+function LeagueStandings({ league, pill }: { league: LeagueId; pill: string }) {
   const t = useTheme();
-  const [view, setView] = useState<NcaaView>('conference');
-  const pill = leagueColors('ncaa', t.mode === 'dark').pill;
-  const q = useQuery({ queryKey: ['ncaa-standings'], queryFn: fetchNcaaStandings });
+  const spec = standingsViews(league);
+  const [view, setView] = useState<Grouping>(spec.defaultView);
+  // Null = the route's default (the current season); the switch sets an id from `seasons`.
+  const [seasonId, setSeasonId] = useState<string | null>(null);
+  const [allStats, setAllStats] = useAllStats();
+
+  const q = useQuery({
+    queryKey: ['standings', league, seasonId],
+    queryFn: () => fetchStandingsPayload(league, seasonId),
+    refetchInterval: 60_000,
+  });
+  // The standings feeds carry one joined name per club; the place a non-NHL row is named by comes
+  // from the team directory, joined on the page id (lib/team-name rule).
+  const dir = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
+  const placeById = useMemo(() => new Map((dir.data ?? []).map((tm) => [tm.id, tm.location])), [dir.data]);
   const { refreshing, onRefresh } = usePullRefresh(q.refetch);
+
+  const groups = useMemo(
+    () => (q.data ? buildStandingsGroups(league, q.data, view, { rail: pill, placeById }) : []),
+    [q.data, league, view, pill, placeById],
+  );
+  const note = standingsNote(league);
+  const hasStats = groups.some((g) => g.statColumns?.length);
 
   if (q.isLoading) return <StateView kind="loading" />;
   if (q.isError) return <StateView kind="error" message="Couldn’t load standings." onRetry={() => q.refetch()} />;
-  const groups = q.data ?? [];
-  if (!groups.length) return <StateView kind="empty" title="No standings" message="Not available yet." />;
+  if (!groups.length) return <StateView kind="empty" title="No standings" message="Not available for this league yet." />;
 
-  const sections = view === 'conference'
-    ? groups.map((g) => ({ label: g.conference, teams: g.teams }))
-    : [{ label: '', teams: [...groups.flatMap((g) => g.teams)].sort((a, b) => ncaaWinPct(b) - ncaaWinPct(a)) }];
-  const superTint = t.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.045)';
-
+  const onText = t.mode === 'dark' ? '#0b0b0b' : '#ffffff';
   return (
-    <View style={{ flex: 1 }}>
-      <SegmentedFilter options={['conference', 'league']} value={view} onChange={(v) => setView(v as NcaaView)} pill={pill} />
-      <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}>
-        {sections.map((sec, si) => (
-          <View key={si}>
-            <View style={[styles.row, { backgroundColor: superTint, borderColor: t.border }]}>
-              <Text style={{ flex: 1, color: t.sub, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }} numberOfLines={1}>{sec.label || 'Team'}</Text>
-              <Text style={[styles.rec, { color: t.sub }]}>Conf</Text>
-              <Text style={[styles.rec, { color: t.sub }]}>Overall</Text>
-            </View>
-            {sec.teams.map((team, i) => <NcaaRow key={team.routeId ?? i} team={team} card={card} />)}
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 10 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
+    >
+      {/* The toolbar: the view tabs (where a league has more than one), the season switch, and one
+          "All stats" switch for every card. */}
+      <View style={styles.toolbar}>
+        {spec.views.length > 1 ? (
+          <View style={[styles.segment, { backgroundColor: t.card, borderColor: t.border }]}>
+            {spec.views.map((v) => {
+              const on = v === view;
+              return (
+                <Text key={v} onPress={() => setView(v)} style={[styles.segItem, on && { backgroundColor: pill }, { color: on ? onText : t.sub, fontWeight: on ? '700' : '600' }]}
+                  accessibilityRole="tab" accessibilityState={{ selected: on }}>
+                  {VIEW_LABEL[v]}
+                </Text>
+              );
+            })}
           </View>
-        ))}
-        <View style={{ height: 20 }} />
-      </ScrollView>
-    </View>
-  );
-}
-
-function NcaaRow({ team, card }: { team: NcaaStandingsTeam; card: string }) {
-  const t = useTheme();
-  return (
-    <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.routeId } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.row, { borderColor: t.border, backgroundColor: card }])}>
-        <TeamLogo uri={team.logo} size={22} />
-        <Text style={{ flex: 1, color: t.text, fontSize: 15, fontWeight: '600', marginLeft: 8 }} numberOfLines={1}>{team.name}</Text>
-        <Text style={[styles.rec, { color: t.text, fontVariant: ['tabular-nums'] }]}>{team.cW}-{team.cL}-{team.cT}</Text>
-        <Text style={[styles.rec, { color: t.sub, fontVariant: ['tabular-nums'] }]}>{team.oW}-{team.oL}-{team.oT}</Text>
-      </Pressable>
-    </Link>
+        ) : null}
+        <View style={styles.toolbarRight}>
+          <SeasonSelect seasons={q.data?.seasons ?? []} value={q.data?.seasonId ?? null} onChange={setSeasonId} />
+          {hasStats ? (
+            <View style={styles.switchWrap}>
+              <Text style={{ color: t.sub, fontSize: 12 }}>All stats</Text>
+              <Switch value={allStats} onValueChange={setAllStats} trackColor={{ true: t.accent }} style={styles.switch} accessibilityLabel="All stats" />
+            </View>
+          ) : null}
+        </View>
+      </View>
+      {groups.map((g) => <StandingsCard key={g.key} group={g} allStats={allStats} />)}
+      {note ? <Text style={{ color: t.subtle, fontSize: 10.5, lineHeight: 14, paddingHorizontal: 2 }}>{note}</Text> : null}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
-  head: { paddingVertical: 6 },
-  rank: { width: 22, fontSize: 13, textAlign: 'center' },
-  stat: { width: 34, textAlign: 'right', fontSize: 13 },
-  rec: { width: 78, textAlign: 'right', fontSize: 13 },
-  confRow: { paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
-  confPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  toolbar: { gap: 8 },
+  segment: { flexDirection: 'row', borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, padding: 2, gap: 2 },
+  segItem: { flex: 1, textAlign: 'center', paddingVertical: 7, borderRadius: 8, fontSize: 13, overflow: 'hidden' },
+  toolbarRight: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14, minHeight: 24 },
+  switchWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  switch: { transform: [{ scaleX: 0.75 }, { scaleY: 0.75 }] },
 });

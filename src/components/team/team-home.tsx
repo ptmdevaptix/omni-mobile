@@ -1,13 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { NewsCard } from '@/components/news-card';
+import { MiniStandings } from '@/components/standings-card';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
+import { leagueOf } from '@/lib/api';
 import { seasonOf, shortDate, timeOfDay } from '@/lib/format';
+import { fetchAllTeams, leagueColors, type LeagueId } from '@/lib/leagues';
 import { fetchTeamNews } from '@/lib/news';
+import { NHL_TEAM_NAMES } from '@/lib/nhl-teams';
 import { fetchTeamHome } from '@/lib/team';
-import type { DivTeam, Leader, MiniGame, TeamHomeData } from '@/lib/team-types';
+import type { StandingsCardGroup, StandingsZone } from '@/lib/standings-cards';
+import type { Leader, MiniGame, TeamHomeData } from '@/lib/team-types';
 import { useTheme } from '@/lib/theme';
 
 export function TeamHome({ teamId }: { teamId: string }) {
@@ -69,11 +75,7 @@ export function TeamHome({ teamId }: { teamId: string }) {
         </Card>
       ) : null}
 
-      {d.division?.length ? (
-        <Card title={d.divisionName || 'Division'}>
-          {d.division.map((dt, i) => <DivRow key={`${dt.abbr}-${i}`} dt={dt} me={teamId} rank={i + 1} />)}
-        </Card>
-      ) : null}
+      {d.division?.length ? <DivisionCard teamId={teamId} d={d} /> : null}
     </ScrollView>
   );
 }
@@ -145,18 +147,66 @@ function Stat({ label, val, rank, total }: { label: string; val: string; rank?: 
   );
 }
 
-function DivRow({ dt, me, rank }: { dt: DivTeam; me: string; rank: number }) {
+/**
+ * The team page's standings card, in the standings page's own look (MiniStandings): rank, rail,
+ * crest, name, record, points, with the club's own row picked out. Bands only where the rule is a
+ * fixed rank in THIS table — the NHL's division top three, and the European leagues' cut lines;
+ * the AHL, CHL, USHL and ECHL seed by a rule the division table cannot draw, so they show none.
+ * Mirrors DivisionSnippet in the web's components/team-home.tsx.
+ */
+function DivisionCard({ teamId, d }: { teamId: string; d: TeamHomeData }) {
   const t = useTheme();
-  const isMe = dt.id === me || dt.abbr?.toLowerCase() === me.toLowerCase();
-  return (
-    <View style={styles.div}>
-      <Text style={{ width: 20, color: t.subtle, fontSize: 12, textAlign: 'center' }}>{rank}</Text>
-      <TeamLogo uri={dt.logo} size={18} />
-      <Text style={{ flex: 1, color: isMe ? t.accent : t.text, fontSize: 13, fontWeight: isMe ? '800' : '600' }} numberOfLines={1}>{dt.abbr}</Text>
-      <Text style={{ color: t.sub, fontSize: 12, fontVariant: ['tabular-nums'] }}>{dt.wins}-{dt.losses}-{dt.otl}</Text>
-      <Text style={{ width: 34, color: t.text, fontSize: 13, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] }}>{dt.points}</Text>
-    </View>
-  );
+  const league = leagueOf(teamId);
+  const nhl = league === 'NHL';
+  const euro = league === 'SHL' || league === 'LIIGA' || league === 'ELH';
+  const ncaa = league === 'NCAA';
+  // The place a non-NHL row is named by, from the team directory (lib/team-name rule).
+  const dir = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
+  const placeById = useMemo(() => new Map((dir.data ?? []).map((tm) => [tm.id, tm.location])), [dir.data]);
+  const me = teamId.toLowerCase();
+  const rows = d.division.map((dt) => {
+    const id = dt.id ?? dt.abbr.toLowerCase();
+    // The record in the league's own order: W-L-T for college, W-OTW-OTL-L in Europe (the shared
+    // row folds overtime wins into `wins`; `otw` carries them separately where the league splits them).
+    const record = euro && dt.otw != null ? `${dt.wins - dt.otw}-${dt.otw}-${dt.otl}-${dt.losses}` : `${dt.wins}-${dt.losses}-${dt.otl}`;
+    return {
+      id, abbr: dt.abbr, logo: dt.logo, darkLogo: dt.darkLogo, gp: dt.gp, record, pts: dt.points,
+      name: nhl ? NHL_TEAM_NAMES[dt.abbr.toUpperCase()]?.nickname ?? dt.name : placeById.get(id) || dt.name,
+      us: id === me || dt.abbr?.toLowerCase() === me,
+      badge: dt.clinch ? { label: dt.clinch.toUpperCase(), kind: 'in' as const } : undefined,
+    };
+  });
+  const [direct = 0, playIn = 0, safe = 0] = d.cuts ?? [];
+  const size = rows.length;
+  const group: StandingsCardGroup = {
+    key: 'division', title: d.divisionName || 'Division', rows,
+    railColor: leagueColors(leagueIdOf(league), t.mode === 'dark').pill,
+    recordFormat: euro ? 'W-OTW-OTL-L' : ncaa ? 'W-L-T' : 'W-L-OTL',
+    recordLabel: euro ? 'W-OTW-OTL-L' : ncaa ? 'W-L-T' : 'Record',
+    ...(nhl ? {
+      lines: [{ after: 3, label: 'Division top 3 — automatic' }],
+      zoneOf: (rank: number): StandingsZone => (rank <= 3 ? 'in' : 'out'),
+      legend: [{ zone: 'in' as const, label: 'Division top 3' }],
+    } : euro && direct ? {
+      lines: [
+        { after: direct, label: 'Playoff line' },
+        ...(playIn ? [{ after: playIn, label: 'Play-in line' }] : []),
+        ...(safe && safe < size ? [{ after: safe, label: 'Relegation line' }] : []),
+      ],
+      zoneOf: (rank: number): StandingsZone => (rank <= direct ? 'in' : playIn && rank <= playIn ? 'bubble' : safe && rank > safe && safe < size ? 'drop' : 'out'),
+      legend: [{ zone: 'in' as const, label: 'Playoffs' }, { zone: 'bubble' as const, label: 'Play-in' }, ...(safe && safe < size ? [{ zone: 'drop' as const, label: 'Relegation' }] : [])],
+    } : {}),
+  };
+  return <MiniStandings group={group} />;
+}
+
+// The picker id whose color a club's card wears: the member league for the CHL and Jr A blocks
+// resolves through the club's id prefix; the rest map by name.
+function leagueIdOf(league: string): LeagueId {
+  const l = league.toLowerCase();
+  if (l === 'chl') return 'ohl';
+  if (l === 'cjra') return 'bchl';
+  return l as LeagueId;
 }
 
 const styles = StyleSheet.create({
@@ -166,5 +216,4 @@ const styles = StyleSheet.create({
   seasonDivider: { height: 1, borderRadius: 1, marginVertical: 7, marginHorizontal: 2, opacity: 0.45 },
   ldr: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
   stRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 4 },
-  div: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
 });
