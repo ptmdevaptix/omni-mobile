@@ -47,7 +47,12 @@ export type ScheduleGame = {
   preseason?: boolean; // exhibition — PRE tag, not part of the record
   overtime?: 'OT' | 'SO';
   state: 'FINAL' | 'UPCOMING' | 'POSTPONED';
+  /** Networks for the country this matchup leads with; `altBroadcasts` is the other country's. */
   broadcasts?: string[];
+  altBroadcasts?: string[];
+  broadcastCountry?: 'CA' | 'US';
+  /** Per network: which country it serves and whether it is national, in-market or out-of-market. */
+  broadcastDetail?: { network: string; country?: 'CA' | 'US'; scope?: 'national' | 'in-market' | 'out-of-market'; side?: 'H' | 'A' }[];
   postseason?: string;
   venue?: string;
 };

@@ -5,7 +5,7 @@ import { useTheme } from '@/lib/theme';
 // Pill-colored segmented control used above standings tables (Conference / League / Division …).
 // `flush` drops the built-in horizontal padding — use it when the parent already pads its content
 // (e.g. the game-detail ScrollView), so the control lines up full-width with the cards around it.
-export function SegmentedFilter({ options, value, onChange, pill, flush = false }: { options: string[]; value: string; onChange: (v: string) => void; pill: string; flush?: boolean }) {
+export function SegmentedFilter({ options, value, onChange, pill, flush = false, capitalize = true }: { options: string[]; value: string; onChange: (v: string) => void; pill: string; flush?: boolean; capitalize?: boolean }) {
   const t = useTheme();
   const onText = t.mode === 'dark' ? '#0b0b0b' : '#ffffff';
   return (
@@ -15,7 +15,9 @@ export function SegmentedFilter({ options, value, onChange, pill, flush = false 
           const on = v === value;
           return (
             <Pressable key={v} onPress={() => onChange(v)} style={[styles.segItem, on && { backgroundColor: pill }]}>
-              <Text style={{ color: on ? onText : t.sub, fontSize: 13, fontWeight: on ? '700' : '600', textTransform: 'capitalize' }}>{v}</Text>
+              {/* `capitalize` suits a lowercase view name ("division"); an abbreviation already
+                  carries its own case, and capitalize turned "CA" into "Ca". */}
+              <Text style={{ color: on ? onText : t.sub, fontSize: 13, fontWeight: on ? '700' : '600', textTransform: capitalize ? 'capitalize' : 'none' }}>{v}</Text>
             </Pressable>
           );
         })}

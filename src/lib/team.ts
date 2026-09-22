@@ -33,6 +33,23 @@ function subPath(teamId: string, sub: string): string {
   return `${teamHeaderPath(teamId)}/${sub}`;
 }
 
+/**
+ * The club's colours and its affiliates — neither is on the per-league header endpoints, and both
+ * are the same answer for every league, so they come from the one registry route.
+ */
+export type TeamLookup = {
+  id: string; abbr: string; league: string; name: string; location?: string; nickname?: string;
+  logo?: string; darkLogo?: string;
+  colors?: { primary?: string; secondary?: string };
+  affiliates?: {
+    nhl?: AffiliateRef; ahl?: AffiliateRef; echl?: AffiliateRef[];
+  };
+};
+export type AffiliateRef = { id: string; href?: string; name: string; location?: string; logo?: string };
+
+export const fetchTeamLookup = (id: string) =>
+  api<{ teams?: Record<string, TeamLookup> }>(`/teams/lookup?ids=${encodeURIComponent(id)}`).then((r) => r.teams?.[id]);
+
 export const fetchTeamHome = (id: string) => api<TeamHomeData>(subPath(id, 'home'));
 export const fetchTeamRoster = (id: string) => api<RosterResponse>(subPath(id, 'roster'));
 export const fetchTeamStats = (id: string) => api<TeamStatsResponse>(subPath(id, 'stats'));

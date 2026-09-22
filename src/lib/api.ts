@@ -70,6 +70,18 @@ export function teamHeaderPath(rawId: string): string {
   return `/team/${teamId}`;
 }
 
+/**
+ * The league a club PLAYS in, for display: "chl-ohl-7" → OHL, "chl-lhjmq-2" → QMJHL,
+ * "cjra-ojhl-21" → OJHL. `leagueOf` deliberately answers the BLOCK instead, because that is what
+ * decides which tabs a club shows; a header that said "CHL" named a competition nobody plays in.
+ */
+export function displayLeagueOf(rawId: string): string {
+  const teamId = canonicalTeamId(rawId);
+  const m = /^(?:chl|cjra)-([a-z]+)-/.exec(teamId);
+  if (!m) return leagueOf(teamId);
+  return m[1] === 'lhjmq' ? 'QMJHL' : m[1].toUpperCase();
+}
+
 export function leagueOf(rawId: string): string {
   const teamId = canonicalTeamId(rawId);
   if (teamId.startsWith("ahl-")) return "AHL";
