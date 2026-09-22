@@ -9,6 +9,8 @@ import type { StandingsSeason } from './standings-cards';
 export type SkaterRow = {
   key: string;
   name: string;
+  /** The feed's own player id — what a followed-player match joins on (lib/follows rowIsPlayer). */
+  playerId?: number | string;
   /** The club's abbreviation, crest and page, where the feed gives them. */
   team: string; teamId?: string; teamName?: string; teamLogo?: string; teamDarkLogo?: string;
   /** The NHL id, for a row that links to a player page. */
@@ -25,6 +27,7 @@ export type SkaterRow = {
 export type GoalieRow = {
   key: string;
   name: string;
+  playerId?: number | string;
   team: string; teamId?: string; teamName?: string; teamLogo?: string; teamDarkLogo?: string;
   nhlId?: number;
   league: string;
@@ -95,14 +98,14 @@ export async function fetchLeagueStats(id: LeagueId, season: string | null): Pro
       api<any>(`/nhl-stats?type=goalies${q ? `&${q}` : ''}`),
     ]);
     const skaters: SkaterRow[] = (s.skaters ?? []).map((r: any): SkaterRow => ({
-      key: `nhl-${r.playerId}`, name: r.name, team: r.team, teamLogo: nhlLogo(r.team), teamDarkLogo: nhlDarkLogo(r.team), nhlId: r.playerId, league: 'nhl', position: r.position,
+      key: `nhl-${r.playerId}`, playerId: r.playerId, name: r.name, team: r.team, teamLogo: nhlLogo(r.team), teamDarkLogo: nhlDarkLogo(r.team), nhlId: r.playerId, league: 'nhl', position: r.position,
       gp: num(r.gp), goals: num(r.goals), assists: num(r.assists), points: num(r.points), pointsPerGame: num(r.pointsPerGame), plusMinus: num(r.plusMinus),
       pim: num(r.pim), toiPerGame: num(r.toiPerGame), ppGoals: num(r.ppGoals), shGoals: num(r.shGoals), shots: num(r.shots), shootingPct: num(r.shootingPct),
       // The NHL writes the faceoff percentage as a decimal (.520); every other feed as a percent.
       faceoffWins: num(r.faceoffWins), faceoffLosses: num(r.faceoffLosses), faceoffPct: num(r.faceoffWinPct) * 100,
     }));
     const goalies: GoalieRow[] = (g.goalies ?? []).map((r: any): GoalieRow => ({
-      key: `nhl-${r.playerId}`, name: r.name, team: r.team, teamLogo: nhlLogo(r.team), teamDarkLogo: nhlDarkLogo(r.team), nhlId: r.playerId, league: 'nhl',
+      key: `nhl-${r.playerId}`, playerId: r.playerId, name: r.name, team: r.team, teamLogo: nhlLogo(r.team), teamDarkLogo: nhlDarkLogo(r.team), nhlId: r.playerId, league: 'nhl',
       gp: num(r.gp), gs: num(r.gs), wins: num(r.wins), losses: num(r.losses), ot: num(r.otLosses),
       gaa: num(r.gaa), sa: num(r.shotsAgainst), ga: num(r.goalsAgainst), sv: num(r.saves), svPct: num(r.savePct), so: num(r.shutouts),
     }));
@@ -113,13 +116,13 @@ export async function fetchLeagueStats(id: LeagueId, season: string | null): Pro
     const d = await api<any>(`/ahl-stats${q ? `?${q}` : ''}`);
     return {
       skaters: (d.skaters ?? []).map((r: any): SkaterRow => ({
-        key: `ahl-${r.playerId}`, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: r.teamId ? `https://assets.leaguestat.com/ahl/logos/50x50/${r.teamId}.png` : undefined,
+        key: `ahl-${r.playerId}`, playerId: r.playerId, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: r.teamId ? `https://assets.leaguestat.com/ahl/logos/50x50/${r.teamId}.png` : undefined,
         league: 'ahl', position: r.position,
         gp: num(r.gp), goals: num(r.goals), assists: num(r.assists), points: num(r.points), pointsPerGame: num(r.pointsPerGame), plusMinus: num(r.plusMinus),
         pim: num(r.pim), ppGoals: num(r.ppGoals), shGoals: num(r.shGoals), shots: num(r.shots), shootingPct: num(r.shootingPct),
       })),
       goalies: (d.goalies ?? []).map((r: any): GoalieRow => ({
-        key: `ahl-${r.playerId}`, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: r.teamId ? `https://assets.leaguestat.com/ahl/logos/50x50/${r.teamId}.png` : undefined,
+        key: `ahl-${r.playerId}`, playerId: r.playerId, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: r.teamId ? `https://assets.leaguestat.com/ahl/logos/50x50/${r.teamId}.png` : undefined,
         league: 'ahl', gp: num(r.gp), wins: num(r.wins), losses: num(r.losses), ot: num(r.ot), gaa: num(r.gaa), sa: num(r.sa), ga: num(r.ga), sv: num(r.sv), svPct: num(r.svPct), so: num(r.so),
       })),
       meta: { league: 'ahl', season: d.season, seasons: d.seasons ?? [], isPriorSeason: d.isPriorSeason, hasFaceoffs: false, hasGoalieSA: true, hasPim: true, hasToi: false, hasGs: false, hasOt: true },
@@ -151,14 +154,14 @@ export async function fetchLeagueStats(id: LeagueId, season: string | null): Pro
   const logoFor = (r: any) => r.teamLogo ?? (r.teamId && r.leagueStatCode ? `https://assets.leaguestat.com/${r.leagueStatCode}/logos/${r.teamId}.png` : undefined);
   return {
     skaters: (d.skaters ?? []).map((r: any): SkaterRow => ({
-      key: `${r.leagueStatCode ?? code}-${r.playerId}`, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: logoFor(r),
+      key: `${r.leagueStatCode ?? code}-${r.playerId}`, playerId: r.playerId, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: logoFor(r),
       league: String(r.leagueStatCode ?? code).toLowerCase(), position: r.position,
       gp: num(r.gp), goals: num(r.goals), assists: num(r.assists), points: num(r.points), pointsPerGame: num(r.pointsPerGame), plusMinus: num(r.plusMinus),
       pim: num(r.pim), ppGoals: num(r.ppGoals), shGoals: num(r.shGoals), shots: num(r.shots), shootingPct: num(r.shootingPct),
       faceoffWins: num(r.faceoffWins), faceoffLosses: num(r.faceoffLosses), faceoffPct: num(r.faceoffPct),
     })),
     goalies: (d.goalies ?? []).map((r: any): GoalieRow => ({
-      key: `${r.leagueStatCode ?? code}-${r.playerId}`, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: logoFor(r),
+      key: `${r.leagueStatCode ?? code}-${r.playerId}`, playerId: r.playerId, name: r.name, team: r.team, teamId: r.teamId, teamName: r.teamName, teamLogo: logoFor(r),
       league: String(r.leagueStatCode ?? code).toLowerCase(),
       gp: num(r.gp), wins: num(r.wins), losses: num(r.losses), ot: num(r.ot), gaa: num(r.gaa), sa: num(r.sa), ga: num(r.ga), sv: num(r.sv), svPct: num(r.svPct), so: num(r.so),
     })),

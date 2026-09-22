@@ -9,6 +9,7 @@ import { playerRouteId } from '@/lib/player';
 import { fetchTeamRoster } from '@/lib/team';
 import type { RosterPlayer } from '@/lib/team-types';
 import { useTheme } from '@/lib/theme';
+import { useFollowedMatcher } from '@/lib/use-follows';
 
 export function TeamRoster({ teamId }: { teamId: string }) {
   const t = useTheme();
@@ -73,6 +74,10 @@ function posAbbr(p: RosterPlayer): string | null {
 
 function PlayerRow({ p, routeId, flagInName }: { p: RosterPlayer; routeId: string | null; flagInName: boolean }) {
   const t = useTheme();
+  // One of the reader's own, starred the way the box score stars him. Not done on the prospects
+  // tab, where every row would carry the mark and the mark would say nothing.
+  const followed = useFollowedMatcher();
+  const mine = !!followed({ name: p.name, playerId: p.id, playerSlug: p.playerSlug });
   const abbr = posAbbr(p);
   const flag = flagInName ? countryFlag(p.birthCountry) : undefined;
   const htwt = [p.height, p.weight ? `${p.weight} lb` : null].filter(Boolean).join(' · ');
@@ -80,8 +85,8 @@ function PlayerRow({ p, routeId, flagInName }: { p: RosterPlayer; routeId: strin
     <>
       <Text style={[styles.num, { color: t.subtle }]}>{p.number != null ? p.number : '--'}</Text>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>
-          {p.name}{abbr ? <Text style={{ color: t.sub, fontWeight: '400' }}> ({abbr})</Text> : null}{flag ? <Text accessibilityLabel={p.birthCountry}> {flag}</Text> : null}
+        <Text style={{ color: mine ? t.accent : t.text, fontSize: 15, fontWeight: mine ? '800' : '600' }} numberOfLines={1}>
+          {mine ? '★ ' : ''}{p.name}{abbr ? <Text style={{ color: t.sub, fontWeight: '400' }}> ({abbr})</Text> : null}{flag ? <Text accessibilityLabel={p.birthCountry}> {flag}</Text> : null}
         </Text>
         {p.birthplace ? <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>{p.birthplace}</Text> : null}
       </View>

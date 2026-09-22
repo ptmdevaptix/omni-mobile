@@ -7,6 +7,7 @@ import { playerRouteId } from '@/lib/player';
 import type { RateFloor } from '@/lib/stat-qualifiers';
 import { leagueCodeLabel, type GoalieRow, type SkaterRow, type StatsMeta } from '@/lib/stats';
 import { useTheme } from '@/lib/theme';
+import { useFollowedMatcher } from '@/lib/use-follows';
 
 // The leaderboard tables — skaters and goalies — as the web draws them (components/ht-stats.tsx
 // SkatersTable/GoaliesTable): rank, player with crest, position, a league column on a combined
@@ -95,12 +96,15 @@ function fitName(name: string, max = 12): string {
   return p.length < 2 ? name : `${p[0][0]}. ${p[p.length - 1]}`;
 }
 
-type Base = { key: string; name: string; team: string; teamLogo?: string; teamDarkLogo?: string; nhlId?: number; league: string; gp: number; position?: string };
+type Base = { key: string; name: string; playerId?: number | string; team: string; teamLogo?: string; teamDarkLogo?: string; nhlId?: number; league: string; gp: number; position?: string };
 
 function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, floor, noun }: {
   rows: R[]; cols: Col<R>[]; defaultSort: string; showLeague: boolean; showPos: boolean; floor: RateFloor; noun: string;
 }) {
   const t = useTheme();
+  // A leaderboard is a list of strangers with, now and then, one of the reader's own in it. Marked
+  // the same way the box score marks them: a star and the accent colour.
+  const followed = useFollowedMatcher();
   const [sortKey, setSortKey] = useState(defaultSort);
   const [desc, setDesc] = useState(true);
   const [shown, setShown] = useState(PAGE_SIZE);
@@ -136,19 +140,24 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
     );
   };
 
-  const nameCell = (r: R, i: number) => (
+  const nameCell = (r: R, i: number) => {
+    const mine = !!followed(r);
+    return (
     <View style={[styles.cell, styles.nameCell, { width: W.name }]}>
       <Text style={[styles.num, { color: t.subtle, width: W.rank, textAlign: 'right' }]}>{i + 1}</Text>
       <TeamLogo uri={r.teamLogo} darkUri={r.teamDarkLogo} size={18} />
       <View style={{ flexShrink: 1 }}>
-        <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{fitName(r.name)}</Text>
+        <Text style={{ color: mine ? t.accent : t.text, fontSize: 13, fontWeight: mine ? '800' : '600' }} numberOfLines={1}>
+          {mine ? '★ ' : ''}{fitName(r.name, mine ? 10 : 12)}
+        </Text>
         {/* Position, league and club — a column each on the web, one quiet line here. */}
         <Text style={{ color: t.subtle, fontSize: 10.5 }} numberOfLines={1}>
           {[showPos ? r.position : null, showLeague ? leagueCodeLabel(r.league) : null, r.team].filter(Boolean).join(' · ')}
         </Text>
       </View>
     </View>
-  );
+    );
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 
 import { api } from './api';
 import { useFavorites, type FavoriteTeam } from './favorites';
-import { mergeClubs, type DerivedClub, type FollowedPlayerClub, type ProspectClubs } from './follows';
+import { mergeClubs, rowIsPlayer, type DerivedClub, type DerivedPlayer, type FollowedPlayerClub, type ProspectClubs } from './follows';
 
 const FRESH_MS = 4 * 3600_000;
 const NONE: DerivedClub[] = [];
@@ -63,6 +63,35 @@ export function useDerivedClubs(): { clubs: DerivedClub[]; ready: boolean } {
 
   const ready = loaded && (!starIds || stars.data !== undefined);
   return { clubs, ready };
+}
+
+/** A row in any list that might name a followed player: a box score, a leaderboard, a roster. */
+export type NamedRow = { name: string; playerId?: number | string; playerSlug?: string };
+
+/**
+ * Is this row one of the user's followed players — a hand-starred one, or a prospect of an org whose
+ * switch is on? Used wherever a name appears in a LIST: box scores, leaderboards, team rosters.
+ *
+ * Deliberately NOT used on a player's own page (the star there already says it) or on a team's
+ * prospects tab, where every row would be marked and the mark would say nothing.
+ *
+ * The stored slug is the certain match where a row carries one; otherwise rowIsPlayer joins on the
+ * feed's own id, and failing that on the surname plus an equivalent first name.
+ */
+export function useFollowedMatcher(): (row: NamedRow) => DerivedPlayer | undefined {
+  const { clubs } = useDerivedClubs();
+  const players = useMemo(() => clubs.flatMap((c) => c.players), [clubs]);
+  return useCallback(
+    (row: NamedRow) => {
+      if (!players.length || !row?.name) return undefined;
+      if (row.playerSlug) {
+        const bySlug = players.find((p) => p.starIds.includes(row.playerSlug!));
+        if (bySlug) return bySlug;
+      }
+      return players.find((p) => rowIsPlayer(row, p));
+    },
+    [players],
+  );
 }
 
 /**

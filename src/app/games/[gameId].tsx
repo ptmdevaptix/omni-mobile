@@ -10,6 +10,7 @@ import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { shortDate, timeOfDay } from '@/lib/format';
 import { followedLabel, followedOnGame, type FollowedOnGame } from '@/lib/follows';
+import { useFollowedMatcher } from '@/lib/use-follows';
 import { fetchGameDetail } from '@/lib/game';
 import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo } from '@/lib/game-detail-types';
 import { composeTeamName } from '@/lib/team-name';
@@ -174,6 +175,9 @@ function Upcoming({ g }: { g: GameDetail }) {
 
 function PlayedBody({ g }: { g: GameDetail }) {
   const t = useTheme();
+  // The reader's own players, marked wherever the summary names them — a star and the accent colour,
+  // the same mark the box score uses.
+  const followed = useFollowedMatcher();
   const hasScoring = g.scoring?.some((p) => p.goals.length);
   const logoFor = (abbr: string) => (abbr === g.awayTeam.abbr ? g.awayTeam.logo : g.homeTeam.logo);
   const darkLogoFor = (abbr: string) => (abbr === g.awayTeam.abbr ? g.awayTeam.darkLogo : g.homeTeam.darkLogo);
@@ -185,7 +189,7 @@ function PlayedBody({ g }: { g: GameDetail }) {
           {g.threeStars.map((s) => (
             <View key={s.star} style={styles.starRow}>
               <Text numberOfLines={1} style={{ color: t.accent, fontSize: 14, fontWeight: '800', minWidth: 46 }}>{'★'.repeat(s.star)}</Text>
-              <Text style={{ flex: 1, color: t.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{s.name} <Text style={{ color: t.sub }}>{s.teamAbbr}</Text></Text>
+              <Text style={{ flex: 1, color: followed({ name: s.name }) ? t.accent : t.text, fontSize: 14, fontWeight: followed({ name: s.name }) ? '800' : '600' }} numberOfLines={1}>{s.name} <Text style={{ color: t.sub }}>{s.teamAbbr}</Text></Text>
               <Text style={{ color: t.sub, fontSize: 13 }}>{s.goals}G {s.assists}A</Text>
             </View>
           ))}
@@ -225,16 +229,29 @@ function PlayedBody({ g }: { g: GameDetail }) {
 
 function GoalRow({ goal, logo, darkLogo }: { goal: GoalInfo; logo?: string; darkLogo?: string }) {
   const t = useTheme();
-  const assists = goal.assists?.map((a) => a.name).join(', ');
+  const followed = useFollowedMatcher();
+  const scorerMine = !!followed({ name: goal.scorer });
+  const assists = goal.assists ?? [];
   return (
     <View style={styles.goalRow}>
       <Text style={{ color: t.sub, fontSize: 16, fontWeight: '600', width: 46, fontVariant: ['tabular-nums'] }}>{goal.time}</Text>
       <TeamLogo uri={logo} darkUri={darkLogo} size={24} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
-          {goal.scorer}{goal.goalType ? <Text style={{ color: t.accent }}> {goal.goalType}</Text> : null}
+        <Text style={{ color: scorerMine ? t.accent : t.text, fontSize: 14, fontWeight: scorerMine ? '800' : '600' }} numberOfLines={1}>
+          {scorerMine ? '★ ' : ''}{goal.scorer}{goal.goalType ? <Text style={{ color: t.accent }}> {goal.goalType}</Text> : null}
         </Text>
-        {assists ? <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>{assists}</Text> : null}
+        {assists.length ? (
+          <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>
+            {assists.map((a, i) => {
+              const mine = !!followed({ name: a.name });
+              return (
+                <Text key={i} style={mine ? { color: t.accent, fontWeight: '700' } : undefined}>
+                  {i ? ', ' : ''}{mine ? '★ ' : ''}{a.name}
+                </Text>
+              );
+            })}
+          </Text>
+        ) : null}
       </View>
       <Text style={{ color: t.text, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{goal.awayScore}-{goal.homeScore}</Text>
     </View>
