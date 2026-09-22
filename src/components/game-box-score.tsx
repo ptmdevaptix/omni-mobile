@@ -3,7 +3,8 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
-import type { BoxGoalie, BoxSkater, GameDetail } from '@/lib/game-detail-types';
+import { rowIsPlayer, type FollowedOnGame } from '@/lib/follows';
+import type { BoxGoalie, BoxSkater, GameDetail, ScratchedPlayer } from '@/lib/game-detail-types';
 import { playerRouteId } from '@/lib/player';
 import { useTheme } from '@/lib/theme';
 
@@ -22,11 +23,15 @@ function fitName(name: string, max = 18): string {
 }
 
 // Per-game box score: pick a team, see its skaters (by line) and goalies with individual stats.
-export function GameBoxScore({ g }: { g: GameDetail }) {
+export function GameBoxScore({ g, followed = [] }: { g: GameDetail; followed?: FollowedOnGame[] }) {
   const t = useTheme();
   const [side, setSide] = useState<'away' | 'home'>('away');
   const rosters = g.rosters;
   if (!rosters) return null;
+  // A followed player's row is starred: joined by the feed's id where we hold it, else by name.
+  const mine = followed.filter((p) => p.side === side);
+  const isMine = (p: { name: string; playerId?: number | string }) => mine.some((f) => rowIsPlayer(p, f));
+  const star = <Text style={{ color: t.accent, fontSize: 11 }} accessibilityLabel="Followed player">★ </Text>;
   // The API links each row by its stored slug for every league it has seeded; the NHL id is the
   // fallback for a player the nightly refresh has not minted yet.
   const nhl = (g.league || '').toUpperCase() === 'NHL';
@@ -73,7 +78,7 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
             {gr.players.map((p) => (
               <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)}>
                 <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
-                <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{fitName(p.name)}</Text>
+                <Text style={[styles.name, { color: t.text, fontWeight: isMine(p) ? '800' : '600' }]} numberOfLines={1}>{isMine(p) ? star : null}{fitName(p.name)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.goals)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.assists)}</Text>
                 {hasSog ? <Text style={[styles.c, { color: t.text }]}>{fmt(p.sog)}</Text> : null}
@@ -101,7 +106,7 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
           {goalies.map((p: BoxGoalie) => (
             <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)}>
               <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
-              <Text style={[styles.name, { color: t.text }]} numberOfLines={1}>{fitName(p.name)}</Text>
+              <Text style={[styles.name, { color: t.text, fontWeight: isMine(p) ? '800' : '600' }]} numberOfLines={1}>{isMine(p) ? star : null}{fitName(p.name)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.shotsAgainst)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.saves)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.goalsAgainst)}</Text>
@@ -111,6 +116,45 @@ export function GameBoxScore({ g }: { g: GameDetail }) {
           ))}
         </View>
       ) : null}
+
+      {g.scratches ? <ScratchesCard g={g} followed={followed} side={side} /> : null}
+    </View>
+  );
+}
+
+/**
+ * Who did not dress. The NHL lists its scratches; everywhere else this is the roster minus the
+ * lineup and the heading says so. A followed player is marked so a fan sees at once that the
+ * prospect he came for is sitting. Without `side`, both clubs, for a pregame page with no box.
+ */
+export function ScratchesCard({ g, followed = [], side }: { g: GameDetail; followed?: FollowedOnGame[]; side?: 'away' | 'home' }) {
+  const t = useTheme();
+  if (!g.scratches) return null;
+  const heading = g.scratches.source === 'listed' ? 'SCRATCHES' : 'NOT DRESSED';
+  const sides = side ? [side] : (['away', 'home'] as const);
+  return (
+    <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+      <Text style={[styles.section, { color: t.sub }]}>{heading}</Text>
+      {sides.map((s) => {
+        const list: ScratchedPlayer[] = g.scratches![s];
+        const mine = followed.filter((p) => p.side === s);
+        const team = s === 'away' ? g.awayTeam : g.homeTeam;
+        return (
+          <View key={s} style={{ marginTop: side ? 0 : 6 }}>
+            {!side ? <Text style={[styles.group, { color: t.subtle, marginTop: 4 }]}>{team.abbr}</Text> : null}
+            {list.length === 0 ? <Text style={{ color: t.subtle, fontSize: 12 }}>None</Text> : list.map((p, i) => {
+              const isMine = mine.some((f) => rowIsPlayer(p, f));
+              return (
+                <BoxRow key={`${p.playerId ?? i}`} routeId={p.playerSlug ?? null}>
+                  <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
+                  <Text style={[styles.name, { color: isMine ? t.accent : t.text, fontWeight: isMine ? '800' : '600' }]} numberOfLines={1}>{isMine ? '★ ' : ''}{p.name}</Text>
+                  <Text style={{ color: t.sub, fontSize: 12 }}>{[p.position, p.reason].filter(Boolean).join(' — ')}</Text>
+                </BoxRow>
+              );
+            })}
+          </View>
+        );
+      })}
     </View>
   );
 }

@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ProspectFollowToggle } from '@/components/prospect-follow-toggle';
 import { StateView } from '@/components/state-view';
 import { TeamHome } from '@/components/team/team-home';
 import { TeamNews } from '@/components/team/team-news';
@@ -49,11 +50,16 @@ export default function TeamScreen() {
                 {team.name}
               </Text>
               <Text style={{ color: t.sub, fontSize: 13, marginTop: 1 }} numberOfLines={1}>
-                {[leagueOf(teamId), team.division, team.record].filter(Boolean).join(' · ')}
+                {/* A league with no divisions files each club under the league's own name
+                    ("SHL · SHL"); the second copy says nothing. */}
+                {[leagueOf(teamId), team.division?.toUpperCase() === leagueOf(teamId) ? null : team.division, team.record].filter(Boolean).join(' · ')}
               </Text>
               {/* Rendered from the array, so a new linkType is a seeder change and needs no edit here.
                   Empty while loading AND when a club has no verified links — both render nothing,
                   deliberately: an unverified club shows no link rather than a guessed one. */}
+              {/* The prospect switch, for an NHL club: its affiliates join your teams and its
+                  prospects' games ride with your favorites (docs/design/prospect-follows.md). */}
+              {leagueOf(teamId) === 'NHL' ? <View style={{ marginTop: 6 }}><ProspectFollowToggle team={teamId} /></View> : null}
               {links.length > 0 ? (
                 <View style={{ flexDirection: 'row', gap: 14, marginTop: 5 }}>
                   {links.map((link) => (

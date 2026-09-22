@@ -12,6 +12,7 @@ import { useFavorites } from '@/lib/favorites';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { fetchPlayer } from '@/lib/player';
 import { useTheme } from '@/lib/theme';
+import { useDerivedClubs } from '@/lib/use-follows';
 
 type FavTeam = { id: string; name: string; logo?: string; darkLogo?: string; league: string };
 type Item = { kind: 'team'; team: FavTeam } | { kind: 'player'; id: string };
@@ -82,7 +83,10 @@ function FavPlayerRow({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['player', id], queryFn: () => fetchPlayer(id) });
   const p = q.data;
   const name = p?.fullName ?? '…';
-  const sub = p ? [p.position, p.teamAbbrev].filter(Boolean).join(' · ') : '';
+  // Where he plays NOW, resolved live — the club whose games this star puts among the favorites.
+  const { clubs } = useDerivedClubs();
+  const following = clubs.find((c) => c.players.some((pl) => pl.starIds.includes(id)))?.name;
+  const sub = following ? `Following · ${following}` : p ? [p.position, p.teamAbbrev].filter(Boolean).join(' · ') : '';
   return (
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
       <Link href={{ pathname: '/players/[playerId]', params: { playerId: id } }} asChild>

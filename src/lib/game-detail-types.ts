@@ -30,6 +30,11 @@ export type BoxGoalie = {
   pim?: number; toi?: string; shotsAgainst?: number; saves?: number; goalsAgainst?: number;
 };
 export type TeamBox = { forwards: BoxSkater[]; defense: BoxSkater[]; goalies: BoxGoalie[] };
+/**
+ * A player on the roster who did not dress. The NHL lists scratches itself; every other feed lists
+ * only who dressed, so there they are the roster minus the lineup and exist only once a lineup does.
+ */
+export type ScratchedPlayer = { playerId?: number | string; name: string; playerSlug?: string; number?: number; position?: string; reason?: string };
 export type GameRosters = { away: TeamBox; home: TeamBox };
 
 export type GameDetail = {
@@ -48,6 +53,9 @@ export type GameDetail = {
   penalties: PenaltyPeriod[];
   threeStars?: ThreeStar[];
   rosters?: GameRosters;
+  scratches?: { away: ScratchedPlayer[]; home: ScratchedPlayer[]; source: 'listed' | 'derived' };
   preview?: string;
+  previewTitle?: string;
+  previewSummary?: string;
 };
 export type GameDetailResponse = { detail?: GameDetail; error?: string; stale?: boolean };

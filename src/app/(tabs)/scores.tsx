@@ -226,7 +226,7 @@ function SlatePage({ league, date, width }: { league: PickerId; date?: string; w
               <SubHeading title={item.heading} />
             ) : (
               <View style={compact ? { flexDirection: 'row', gap: 10 } : undefined}>
-                {item.map((g) => <GameCard key={g.id} game={g} teams={teams} cardColor={c.card} compact={compact} featured={isFavGame(g, favIds)} />)}
+                {item.map((g) => <GameCard key={g.id} game={g} teams={teams} cardColor={c.card} compact={compact} featured={isFavGame(g, favIds)} starred={isFavGame(g, favIds)} />)}
                 {compact && item.length === 1 ? <View style={{ flex: 1 }} /> : null}
               </View>
             )

@@ -3,15 +3,18 @@ import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { GameBoxScore } from '@/components/game-box-score';
+import { GameBoxScore, ScratchesCard } from '@/components/game-box-score';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { shortDate, timeOfDay } from '@/lib/format';
+import { followedLabel, followedOnGame, type FollowedOnGame } from '@/lib/follows';
 import { fetchGameDetail } from '@/lib/game';
 import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo } from '@/lib/game-detail-types';
+import { composeTeamName } from '@/lib/team-name';
 import { useTheme } from '@/lib/theme';
+import { useDerivedClubs } from '@/lib/use-follows';
 
 export default function GameScreen() {
   const t = useTheme();
@@ -25,6 +28,9 @@ export default function GameScreen() {
   });
 
   const g = q.data;
+  // The user's followed players on this game, for the strip and the starred lineup rows.
+  const { clubs } = useDerivedClubs();
+  const followed = followedOnGame(g, clubs);
   const r = g?.rosters;
   const hasBox = !!r && [r.away, r.home].some((x) => x.forwards.length || x.defense.length || x.goalies.length);
   return (
@@ -37,13 +43,18 @@ export default function GameScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
           <Scoreboard g={g} awayId={away} homeId={home} />
+          {followed.length ? <FollowedStrip followed={followed} /> : null}
           {g.periodScores?.length ? <LineScore g={g} /> : null}
           {g.status === 'UPCOMING' ? (
-            <Upcoming g={g} />
+            <>
+              <Upcoming g={g} />
+              {/* Pregame NHL scratches arrive before the box score does — on their own until then. */}
+              {!hasBox && g.scratches && (g.scratches.away.length || g.scratches.home.length) ? <ScratchesCard g={g} followed={followed} /> : null}
+            </>
           ) : hasBox ? (
             <>
               <SegmentedFilter options={['Summary', 'Box Score']} value={tab} onChange={setTab} pill={t.accent} flush />
-              {tab === 'Box Score' ? <GameBoxScore g={g} /> : <PlayedBody g={g} />}
+              {tab === 'Box Score' ? <GameBoxScore g={g} followed={followed} /> : <PlayedBody g={g} />}
             </>
           ) : (
             <PlayedBody g={g} />
@@ -56,7 +67,8 @@ export default function GameScreen() {
 
 function TeamName({ team, routeId }: { team: GDTeam; routeId?: string }) {
   const t = useTheme();
-  const label = `${team.name} ${team.nickname}`.trim() || team.abbr;
+  // The full name, composed the one way a full name is built — a repeat (HV71 HV71) collapses.
+  const label = composeTeamName(team.name, team.nickname) || team.abbr;
   const inner = (
     <View style={styles.teamRow}>
       <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={36} />
@@ -89,6 +101,23 @@ function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; hom
       <Text style={{ color: t.subtle, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
         {[g.seriesInfo, g.venue, g.venueLocation, g.network && `📺 ${g.network}`].filter(Boolean).join(' · ')}
       </Text>
+    </View>
+  );
+}
+
+/** One line above the tabs: who the user follows on this game and whether they dressed. */
+function FollowedStrip({ followed }: { followed: FollowedOnGame[] }) {
+  const t = useTheme();
+  const word = { dressed: 'in lineup', scratched: 'not dressed', unknown: '' } as const;
+  return (
+    <View style={[styles.card, { borderColor: `${t.accent}66`, backgroundColor: `${t.accent}14`, paddingVertical: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 4 }]}>
+      <Text style={{ color: t.accent, fontSize: 12, fontWeight: '800' }}>Your players</Text>
+      {followed.map((p) => (
+        <Text key={`${p.side}-${p.id}`} style={{ color: p.status === 'scratched' ? t.subtle : t.text, fontSize: 12 }}>
+          <Text style={{ fontWeight: '600' }}>{followedLabel(p)}</Text>
+          {word[p.status] ? <Text style={{ color: t.sub }}> · {word[p.status]}</Text> : null}
+        </Text>
+      ))}
     </View>
   );
 }

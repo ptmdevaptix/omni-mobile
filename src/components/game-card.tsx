@@ -1,12 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { memo, useEffect, useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DaysOutSquares } from '@/components/days-out';
 import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { cardDate } from '@/lib/format';
 import { gameLeague, isInterleague } from '@/lib/leagues';
+import { teamDisplayName } from '@/lib/team-name';
 import { useTheme } from '@/lib/theme';
 import type { ScoreGame, ScoreTeam } from '@/lib/types';
 
@@ -22,12 +24,18 @@ const GOLD = ['#f8e6a8', '#c9a227', '#7d6316', '#e9cd72'] as const;   // dark mo
 const PEWTER = ['#f0f2f4', '#a7abb0', '#5f6368', '#c8ccd0'] as const; // light mode
 
 type Result = 'win' | 'loss' | 'tie' | undefined;
-type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string; compact?: boolean };
+/** Why a game is among the favorites — the followed players (grayed when one sat) or the affiliate. */
+export type FollowReason = { items: { label: string; muted: boolean }[] };
+type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string; compact?: boolean; starred?: boolean; reason?: FollowReason };
 
-// Shared score card. Tapping the card opens the game; tapping a team's logo/name opens that team.
-// `featured` wraps it in a metallic border (favorited teams in the Home "My Teams" section).
+// Shared score card. The app's own look — the league badge row on top with the status at the right,
+// no accent bar — deliberately not the web's; what it shares with the web is the CONTENT: a gold star
+// for a starred team's game, the network beside the time (linked when the API knows the broadcaster's
+// page), and how far off a future game is, in squares. Tapping the card opens the game; tapping a
+// team's logo/name opens that team.
+// `featured` wraps it in a metallic border (a favorite among its league on the Scores tab).
 // `compact` renders a tighter, abbreviation-based card so two fit side by side (grid mode).
-function GameCardBase({ game, teams, featured = false, cardColor, compact = false }: GameCardProps) {
+function GameCardBase({ game, teams, featured = false, cardColor, compact = false, starred = false, reason }: GameCardProps) {
   const t = useTheme();
   const router = useRouter();
   const away = teams[game.awayTeamId] ?? {};
@@ -46,6 +54,8 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   // The ECHL has no game-detail pages — its schedule is seeded from the clubs' iCal feeds, which carry
   // no league game id — so its cards don't navigate, the same call the web makes. Team taps still work.
   const hasDetail = game.top !== 'ECHL';
+  const league = gameLeague(game);
+  const nhl = league === 'NHL';
   const openGame = () => {
     if (!hasDetail) return;
     router.push({ pathname: '/games/[gameId]', params: { gameId: game.id, away: game.awayTeamId, home: game.homeTeamId } });
@@ -60,16 +70,41 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
       ? openGame()
       : router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(id) } });
 
+  // The status, led by the gold "yours" star for a starred team's game.
+  const status = (size: number) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+      {starred ? <Text style={{ color: '#f5a623', fontSize: size }} accessibilityLabel="Favorite team">★</Text> : null}
+      <Text style={{ color: live ? t.live : t.sub, fontSize: size, fontWeight: live ? '700' : compact ? '500' : '400', flexShrink: 1 }} numberOfLines={1}>
+        {[dateLabel || null, game.statusLabel].filter(Boolean).join(' · ')}
+      </Text>
+    </View>
+  );
+  // Where to watch, linked to the broadcaster when the API knows the page.
+  const network = game.network ? (
+    game.networkUrl ? (
+      <Pressable onPress={() => Linking.openURL(game.networkUrl!)} hitSlop={6} accessibilityRole="link" style={{ flexShrink: 1 }}>
+        <Text style={{ color: t.sub, fontSize: 11, textDecorationLine: 'underline' }} numberOfLines={1}>📺 {game.network}</Text>
+      </Pressable>
+    ) : (
+      <Text style={{ color: t.sub, fontSize: 11, flexShrink: 1 }} numberOfLines={1}>📺 {game.network}</Text>
+    )
+  ) : null;
+  // How far off, in squares, for a future game — see components/days-out.tsx.
+  const squares = game.status === 'UPCOMING' ? <DaysOutSquares utc={game.startTimeUTC} day={game.gameDate} /> : null;
+  // Who put this game here: "Lechner (COL)", "NYI AFFILIATE" — cycling when there are several.
+  const why = reason?.items.length ? <Reason items={reason.items} size={compact ? 10 : 11} /> : null;
+
   const content = compact ? (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
         {game.preseason ? <Text style={[styles.badge, styles.preBadge, styles.preBadgeCompact, preColors(t.mode)]}>PRE</Text> : null}
-        <Text style={{ color: live ? t.live : t.sub, fontSize: 10, fontWeight: live ? '700' : '500', flexShrink: 1 }} numberOfLines={1}>
-          {[dateLabel || null, game.statusLabel].filter(Boolean).join(' · ')}
-        </Text>
+        {status(10)}
+        <View style={{ flex: 1 }} />
+        {squares}
       </View>
-      <TeamLine compact team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
-      <TeamLine compact team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
+      <TeamLine nhl={nhl} compact team={away} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
+      <TeamLine nhl={nhl} compact team={home} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
+      {why}
     </>
   ) : (
     <>
@@ -82,19 +117,24 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
               An interleague fixture names both, in away-then-home order to match the two rows below;
               a single league badge on a cross-league game reads as though it were an ordinary one. */}
           <Text style={[styles.badge, { color: t.sub, borderColor: t.border }]}>
-            {isInterleague(game) ? game.leagues!.join(' · ') : gameLeague(game)}
+            {isInterleague(game) ? game.leagues!.join(' · ') : league}
           </Text>
           {game.preseason ? <Text style={[styles.badge, styles.preBadge, preColors(t.mode)]}>PRE</Text> : null}
         </View>
         {/* statusLabel is time-only ("5:00 PM ET"), which is ambiguous the moment a card isn't from
             today — and the Home hub now mixes leagues on different days. Date shown only when needed. */}
-        <Text style={{ color: live ? t.live : t.sub, fontSize: 12, fontWeight: live ? '700' : '400' }}>
-          {dateLabel ? `${dateLabel} · ${game.statusLabel}` : game.statusLabel}
-        </Text>
+        {status(12)}
       </View>
-      <TeamLine team={away} id={game.awayTeamId} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
-      <TeamLine team={home} id={game.homeTeamId} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
-      {game.network ? <Text style={{ color: t.sub, fontSize: 11, marginTop: 4 }}>📺 {game.network}</Text> : null}
+      <TeamLine nhl={nhl} team={away} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
+      <TeamLine nhl={nhl} team={home} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
+      {network || squares || why ? (
+        <View style={styles.footer}>
+          {why ?? network}
+          <View style={{ flex: 1 }} />
+          {why && network ? network : null}
+          {squares}
+        </View>
+      ) : null}
     </>
   );
 
@@ -113,9 +153,31 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   );
 }
 
-function TeamLine({ team, id, score, showScore, result, onPress, compact = false }: { team: ScoreTeam; id: string; score?: number; showScore: boolean; result?: Result; onPress: () => void; compact?: boolean }) {
+/** The foot line's follow reason: up to two names side by side, more than two cycling. A followed
+ *  player who did not dress reads in gray — a fan should not have to open the game to learn he sat. */
+function Reason({ items, size }: { items: { label: string; muted: boolean }[]; size: number }) {
   const t = useTheme();
-  const name = compact ? (team.abbr ?? scoreName(team, id)) : scoreName(team, id);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (items.length <= 2) return;
+    const id = setInterval(() => setI((n) => (n + 1) % items.length), 3000);
+    return () => clearInterval(id);
+  }, [items.length]);
+  const shown = items.length <= 2 ? items : [items[i % items.length]];
+  return (
+    <Text style={{ fontSize: size, flexShrink: 1 }} numberOfLines={1}>
+      <Text style={{ color: '#f5a623' }}>★ </Text>
+      {shown.map((it, k) => (
+        <Text key={k} style={{ color: it.muted ? t.subtle : t.sub, fontWeight: '600' }} accessibilityLabel={it.muted ? `${it.label}, not dressed` : undefined}>{k > 0 ? ', ' : ''}{it.label}</Text>
+      ))}
+    </Text>
+  );
+}
+
+function TeamLine({ team, score, showScore, result, onPress, compact = false, nhl }: { team: ScoreTeam; score?: number; showScore: boolean; result?: Result; onPress: () => void; compact?: boolean; nhl: boolean }) {
+  const t = useTheme();
+  // Mini cards abbreviate every league; full cards follow the one naming rule (lib/team-name).
+  const name = compact ? (team.abbr ?? teamDisplayName(team, nhl)) : teamDisplayName(team, nhl);
   const lost = result === 'loss';
   return (
     <View style={styles.teamLine}>
@@ -136,12 +198,6 @@ function TeamLine({ team, id, score, showScore, result, onPress, compact = false
   );
 }
 
-// Score cards show the nickname (NHL/AHL/CHL) or the place/school name (NCAA), with graceful fallbacks.
-// Compact cards use the abbreviation instead (see TeamLine).
-function scoreName(team: ScoreTeam, id: string): string {
-  if (id.startsWith('ncaa-')) return team.location ?? team.name ?? team.abbr ?? id;
-  return team.nickname ?? team.name ?? team.abbr ?? id;
-}
 
 // Skip re-rendering a card when its game + team display data are unchanged — the whole scores list
 // otherwise re-renders on every 30s background refetch, which VirtualizedList flags as slow.
@@ -150,9 +206,10 @@ const teamEq = (x?: ScoreTeam, y?: ScoreTeam) =>
 
 function areEqual(a: GameCardProps, b: GameCardProps): boolean {
   const g1 = a.game, g2 = b.game;
-  if (a.featured !== b.featured || a.cardColor !== b.cardColor || a.compact !== b.compact) return false;
+  if (a.featured !== b.featured || a.cardColor !== b.cardColor || a.compact !== b.compact || a.starred !== b.starred) return false;
+  if (JSON.stringify(a.reason?.items ?? null) !== JSON.stringify(b.reason?.items ?? null)) return false;
   if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel
-    || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network) return false;
+    || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network || g1.networkUrl !== g2.networkUrl) return false;
   return teamEq(a.teams[g1.awayTeamId], b.teams[g2.awayTeamId]) && teamEq(a.teams[g1.homeTeamId], b.teams[g2.homeTeamId]);
 }
 
@@ -168,6 +225,7 @@ const styles = StyleSheet.create({
   leagueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   // The left end of leagueRow: league badge + any qualifier (PRE), kept together against the edge.
   leagueBadges: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   badge: { fontSize: 10, fontWeight: '700', borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   // Filled rather than outlined, so "this result doesn't count" reads at a glance instead of blending
   // into the league badge beside it.

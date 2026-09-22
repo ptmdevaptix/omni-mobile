@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 
 import { TeamLogo } from '@/components/team-logo';
 import { leagueOf } from '@/lib/api';
+import { ProspectFollowToggle } from '@/components/prospect-follow-toggle';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { NOTIFICATION_EVENTS, useNotificationPrefs } from '@/lib/notification-prefs';
@@ -15,7 +16,7 @@ type Row = { id: string; name: string; logo?: string; darkLogo?: string; league:
 
 export default function SettingsScreen() {
   const t = useTheme();
-  const { favorites, moveFavorite, toggle } = useFavorites();
+  const { favorites, favoriteTeams, moveFavorite, toggle } = useFavorites();
   const { prefs, setEnabled, setEvent, setTeamEnabled, isTeamEnabled } = useNotificationPrefs();
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
@@ -149,7 +150,11 @@ export default function SettingsScreen() {
 
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{row.name}</Text>
-                    <Text style={{ color: t.subtle, fontSize: 11 }}>{row.league}</Text>
+                    {/* An affiliate a prospect switch added says whose; an NHL club carries the switch. */}
+                    {(() => { const via = favoriteTeams.find((f) => f.id === row.id)?.via; return via
+                      ? <Text style={{ color: t.subtle, fontSize: 11 }}>{row.league} · Added by {via.toUpperCase()} prospects</Text>
+                      : <Text style={{ color: t.subtle, fontSize: 11 }}>{row.league}</Text>; })()}
+                    {row.league === 'NHL' ? <View style={{ marginTop: 4 }}><ProspectFollowToggle team={row.id} variant="row" /></View> : null}
                   </View>
 
                   {/* Only the notification switch dims with the master toggle — reordering and
