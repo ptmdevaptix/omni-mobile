@@ -21,6 +21,9 @@ export type ScoreGame = {
   awayScore?: number;
   homeScore?: number;
   network?: string;
+  /** The broadcaster's page, when the API knows one; the card links the network name to it. */
+  networkUrl?: string | null;
+  networkCountry?: string;
   startTimeUTC?: string; // ISO puck drop — the reliable way to date a game (statusLabel is time-only)
   gameDate?: string;     // YYYY-MM-DD — feeds that know the day but not the time (seeded NCAA schedules)
   preseason?: boolean; // HockeyTech career=0 seasons (exhibition/pre-season)
@@ -46,23 +49,6 @@ export type ScoresResponse = {
   fetchedAt?: string;
 };
 
-export type StandingsTeam = {
-  name: string;
-  abbr: string;
-  logo?: string;
-  darkLogo?: string;
-  division?: string;
-  conference?: string;
-  gp: number;
-  w: number;
-  l: number;
-  otl: number;
-  pts: number;
-  clinch?: string;
-  routeId?: string; // set by fetchStandings — the /teams/<id> id for tap-through (prefixed for AHL/CHL)
-};
-
-export type StandingsResponse = { teams: StandingsTeam[]; fetchedAt?: string };
 
 // The team header endpoints (/api/team, /api/ncaa-team, …) return slightly different shapes per league,
 // but share these fields (the header is the same across leagues).

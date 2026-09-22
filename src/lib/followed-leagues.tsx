@@ -13,15 +13,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 export type FollowedLeague =
   | 'NHL' | 'AHL' | 'ECHL' | 'NCAA' | 'USHL'
   | 'OHL' | 'WHL' | 'QMJHL'
-  | 'BCHL' | 'AJHL' | 'SJHL' | 'MJHL' | 'OJHL' | 'CCHL';
-export type FollowTarget = FollowedLeague | 'CHL' | 'CJRA';
+  | 'BCHL' | 'AJHL' | 'SJHL' | 'MJHL' | 'OJHL' | 'CCHL'
+  | 'SHL' | 'LIIGA' | 'ELH';
+export type FollowTarget = FollowedLeague | 'CHL' | 'CJRA' | 'EURO';
 
 export const CHL_MEMBER_LEAGUES: readonly FollowedLeague[] = ['OHL', 'WHL', 'QMJHL'];
 // Same reasoning as the CHL, more so: six leagues across five provinces, playing on different
 // nights. Following "Canadian Jr A" is stored as its members, never as the block.
 export const CJRA_MEMBER_LEAGUES: readonly FollowedLeague[] = ['BCHL', 'AJHL', 'SJHL', 'MJHL', 'OJHL', 'CCHL'];
+/** Europe: three national leagues under one pill; each is followed on its own. */
+export const EURO_MEMBER_LEAGUES: readonly FollowedLeague[] = ['SHL', 'LIIGA', 'ELH'];
 export const FOLLOWABLE_LEAGUES: readonly FollowedLeague[] = [
-  'NHL', 'AHL', 'ECHL', 'NCAA', 'USHL', ...CHL_MEMBER_LEAGUES, ...CJRA_MEMBER_LEAGUES,
+  'NHL', 'AHL', 'ECHL', 'NCAA', 'USHL', ...CHL_MEMBER_LEAGUES, ...CJRA_MEMBER_LEAGUES, ...EURO_MEMBER_LEAGUES,
 ];
 export const DEFAULT_FOLLOWED_LEAGUES: readonly FollowedLeague[] = ['NHL'];
 
@@ -34,6 +37,7 @@ const isFollowable = (v: unknown): v is FollowedLeague =>
 export function expandFollowTarget(v: unknown): FollowedLeague[] {
   if (v === 'CHL') return [...CHL_MEMBER_LEAGUES];
   if (v === 'CJRA') return [...CJRA_MEMBER_LEAGUES];
+  if (v === 'EURO') return [...EURO_MEMBER_LEAGUES];
   return isFollowable(v) ? [v] : [];
 }
 

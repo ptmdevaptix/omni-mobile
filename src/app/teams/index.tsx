@@ -40,9 +40,12 @@ export default function TeamsBrowserScreen() {
 
     const label = leagueById(league).label;
     const teams = (q.data ?? []).filter((tm) => tm.league === label);
+    // A league with no divisions or conferences (Europe) has no groups at all; one unheaded grid,
+    // not one headed "Other".
+    const grouped = teams.some((tm) => tm.group);
     const byGroup = new Map<string, TeamDirectoryEntry[]>();
     for (const tm of teams) {
-      const g = tm.group || 'Other';
+      const g = grouped ? tm.group || 'Other' : '';
       if (!byGroup.has(g)) byGroup.set(g, []);
       byGroup.get(g)!.push(tm);
     }
@@ -68,7 +71,7 @@ export default function TeamsBrowserScreen() {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, paddingBottom: 28 }}>
           {groups.map((g) => (
             <View key={g.name} style={{ marginBottom: 6 }}>
-              <Text style={[styles.groupHeader, { color: t.sub }]}>{g.name.toUpperCase()}</Text>
+              {g.name ? <Text style={[styles.groupHeader, { color: t.sub }]}>{g.name.toUpperCase()}</Text> : <View style={{ height: 8 }} />}
               <View style={styles.grid}>
                 {g.teams.map((team) => <TeamCard key={team.id} team={team} card={c.card} />)}
               </View>

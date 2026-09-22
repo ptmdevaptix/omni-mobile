@@ -3,6 +3,8 @@
 // is dark today. Mirrors lib/favorite-games.ts, lib/followed-games.ts and lib/use-league-lookahead.ts
 // on the web so the two Homes agree.
 import { api } from './api';
+import { nhlNickname } from './nhl-teams';
+import { composeTeamName } from './team-name';
 import { dayKey, timeOfDay } from './format';
 import { fetchGameDays, fetchScores, gameLeague, LEAGUES, type LeagueId, type TeamDirectoryEntry } from './leagues';
 import type { ScoreGame, ScoreTeam } from './types';
@@ -53,9 +55,12 @@ export function gameIsFollowed(g: ScoreGame, followed: ReadonlySet<string>): boo
 
 export type NextGameInfo = {
   teamId: string; gameId: string; date: string; startTimeUTC?: string;
+  /** The opponent's PLACE ("Belleville", "Rögle"), which is how a non-NHL card names it. */
   opponentName: string; opponentAbbr: string; opponentLogo?: string; opponentDarkLogo?: string;
   isHome: boolean;
   preseason?: boolean;
+  /** The favorite's own two name fields and crest, so its card names it like every other card. */
+  teamPlace?: string; teamNickname?: string; teamAbbr?: string; teamLogo?: string; teamDarkLogo?: string;
 };
 
 /** GET /next-team-games — first upcoming game per team, however far out (no cap server-side). */
@@ -78,9 +83,27 @@ export function nextGameAsCard(
   entry: TeamDirectoryEntry | undefined,
 ): { game: ScoreGame; teams: Record<string, ScoreTeam> } {
   const oppId = `${info.gameId}-opp`;
-  const mine: ScoreTeam = { name: entry?.name ?? favorite.toUpperCase(), abbr: entry?.abbr ?? favorite.toUpperCase(), logo: entry?.logo, darkLogo: entry?.darkLogo };
-  const them: ScoreTeam = { name: info.opponentName || info.opponentAbbr, abbr: info.opponentAbbr, logo: info.opponentLogo, darkLogo: info.opponentDarkLogo, linkable: false };
   const league = gameLeague({ id: info.gameId } as ScoreGame);
+  // Both sides carry location AND nickname, because that is what the card's naming rule reads
+  // (lib/team-name): the favorite's from the route (else the directory), the opponent's place from
+  // the route — and for the NHL, where the card wants the nickname, from the static NHL table.
+  const mine: ScoreTeam = {
+    name: entry?.name ?? composeTeamName(info.teamPlace, info.teamNickname) ?? favorite,
+    location: info.teamPlace ?? entry?.location,
+    nickname: info.teamNickname ?? entry?.nickname,
+    abbr: info.teamAbbr ?? entry?.abbr ?? favorite.toUpperCase(),
+    logo: entry?.logo ?? info.teamLogo,
+    darkLogo: entry?.darkLogo ?? info.teamDarkLogo,
+  };
+  const them: ScoreTeam = {
+    name: info.opponentName || info.opponentAbbr,
+    location: info.opponentName || undefined,
+    nickname: league === 'NHL' ? nhlNickname(info.opponentAbbr, info.opponentName) : undefined,
+    abbr: info.opponentAbbr,
+    logo: info.opponentLogo,
+    darkLogo: info.opponentDarkLogo,
+    linkable: false,
+  };
   const game: ScoreGame = {
     id: info.gameId,
     top: league === 'OHL' || league === 'WHL' || league === 'QMJHL' ? 'CHL' : league,
@@ -107,7 +130,10 @@ function plusDays(from: string, days: number): string {
   return dayKey(new Date(y, m - 1, d + days));
 }
 
-const leagueIdFor = (label: string): LeagueId | undefined => LEAGUES.find((l) => l.label === label)?.id;
+// Case-insensitive: a Home section is titled by the game feed's code ("LIIGA"), the config by the
+// league's own spelling ("Liiga"), and an exact compare left Liiga's lookahead returning nothing.
+const leagueIdFor = (label: string): LeagueId | undefined =>
+  LEAGUES.find((l) => l.label.toUpperCase() === label.toUpperCase())?.id;
 
 /**
  * For a followed league with nothing today: its next day with games and that day's slate. `date` is ""

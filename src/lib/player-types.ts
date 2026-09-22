@@ -47,7 +47,15 @@ export type PlayerContract = {
 
 export type PlayerDetail = {
   id: string;
+  /**
+   * "nhl" | "ahl" | "chl" | "ncaa" — but a PLACEHOLDER on the roster-only path, where the API says
+   * "nhl" for everyone. The league the career table leads with is `primaryLeague`.
+   */
   league: string;
+  /** The league his career is led by ("OHL"). Absent on the NHL path, where `league` is right. */
+  primaryLeague?: string;
+  /** The stored canonical page slug. Roster-only path only; NHL rows derive it (see canonicalPlayerKey). */
+  slug?: string;
   sourceId: string;
   firstName: string; lastName: string; fullName: string;
   position: string; isGoalie: boolean; number?: number; isActive?: boolean;
@@ -56,6 +64,12 @@ export type PlayerDetail = {
   teamAbbrev?: string; teamName?: string; teamLogo?: string;
   /** The club's page. A non-NHL club's URL is not derivable from its abbreviation. */
   teamHref?: string;
+  /** The club's league ("NHL", "WHL"): Seattle the Thunderbirds is not Seattle the Kraken. */
+  teamLeague?: string;
+  /** False when the club is only the LAST one we know of — he is on no roster we track this season. */
+  clubCurrent?: boolean;
+  /** The season that last club is from ("2025-26"), when `clubCurrent` is false. */
+  clubSeason?: string;
   /**
    * The NHL club that HOLDS him — drafted, signed or traded for — which is not who he plays for. A
    * drafted junior has both, and they are rarely the same team.

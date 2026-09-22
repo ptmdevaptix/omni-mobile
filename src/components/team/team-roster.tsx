@@ -4,6 +4,7 @@ import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
 import { leagueOf } from '@/lib/api';
+import { countryFlag } from '@/lib/country-flags';
 import { playerRouteId } from '@/lib/player';
 import { fetchTeamRoster } from '@/lib/team';
 import type { RosterPlayer } from '@/lib/team-types';
@@ -26,6 +27,12 @@ export function TeamRoster({ teamId }: { teamId: string }) {
 
   if (!sections.length) return <StateView kind="empty" title="No roster" message="Roster isn’t available yet." />;
 
+  // A feed that gives a country and nothing else (the European leagues') would put a lone flag on
+  // every hometown line; for those the flag moves up beside the name — it is the whole of what we
+  // know — and the hometown line goes. Mirrors countryOnly() in the web's team-roster.
+  const all = sections.flatMap((s) => s.data);
+  const flagInName = all.every((p) => !p.birthplace) && all.some((p) => p.birthCountry);
+
   return (
     <SectionList
       style={{ flex: 1, backgroundColor: t.bg }}
@@ -43,7 +50,10 @@ export function TeamRoster({ teamId }: { teamId: string }) {
       renderSectionHeader={({ section }) => (
         <Text style={[styles.section, { color: t.sub }]}>{section.title.toUpperCase()}</Text>
       )}
-      renderItem={({ item }) => <PlayerRow p={item} routeId={isNhl ? playerRouteId(item.id) : playerRouteId(item.nhlId)} />}
+      // The stored slug links every league the API has seeded; the id forms are the fallback for a
+      // row that has no players row yet. The box score reads the same way — the roster had been
+      // left on NHL ids only, so a junior with a page went unlinked here and linked there.
+      renderItem={({ item }) => <PlayerRow p={item} flagInName={flagInName} routeId={item.playerSlug ?? (isNhl ? playerRouteId(item.id) : playerRouteId(item.nhlId))} />}
     />
   );
 }
@@ -61,16 +71,17 @@ function posAbbr(p: RosterPlayer): string | null {
   return pos || null;
 }
 
-function PlayerRow({ p, routeId }: { p: RosterPlayer; routeId: string | null }) {
+function PlayerRow({ p, routeId, flagInName }: { p: RosterPlayer; routeId: string | null; flagInName: boolean }) {
   const t = useTheme();
   const abbr = posAbbr(p);
+  const flag = flagInName ? countryFlag(p.birthCountry) : undefined;
   const htwt = [p.height, p.weight ? `${p.weight} lb` : null].filter(Boolean).join(' · ');
   const body = (
     <>
       <Text style={[styles.num, { color: t.subtle }]}>{p.number != null ? p.number : '--'}</Text>
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>
-          {p.name}{abbr ? <Text style={{ color: t.sub, fontWeight: '400' }}> ({abbr})</Text> : null}
+          {p.name}{abbr ? <Text style={{ color: t.sub, fontWeight: '400' }}> ({abbr})</Text> : null}{flag ? <Text accessibilityLabel={p.birthCountry}> {flag}</Text> : null}
         </Text>
         {p.birthplace ? <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>{p.birthplace}</Text> : null}
       </View>

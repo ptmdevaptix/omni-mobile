@@ -2,14 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { canSlide, ContractTimeline, contractPlayedOut, contractTimeline, nhlGamesForSlide } from '@/components/contract-timeline';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
-import { fetchPlayer, seasonLabel } from '@/lib/player';
+import { canonicalPlayerKey, fetchPlayer, seasonLabel } from '@/lib/player';
 import type { PlayerContract, PlayerDetail, PlayerSeasonStatRow, PlayerStatLine } from '@/lib/player-types';
 import { useTheme } from '@/lib/theme';
 
@@ -25,14 +25,17 @@ export default function PlayerScreen() {
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError || !p || p.error || !p.fullName ? (
-        <StateView kind="empty" title="Player unavailable" message="Full player pages are available for NHL players for now." />
+        <StateView kind="empty" title="Player unavailable" message="This player’s page couldn’t be loaded." />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
           <Hero p={p} />
           {p.currentSeason ? <SeasonCard title="Current Season" line={p.currentSeason} goalie={p.isGoalie} /> : null}
           <BioCard p={p} />
           <ContractCard p={p} />
-          <CareerSection rows={p.seasonTotals ?? []} goalie={p.isGoalie} primaryLeague={(p.league ?? '').toUpperCase()} totals={p.careerTotals} />
+          {/* `primaryLeague`, not `league`: the API says "nhl" for every roster-only player as a
+              placeholder, and keying the tabs on it put an OHL player's whole career under "Other"
+              with no totals. The NHL path sends no primaryLeague, and there `league` is right. */}
+          <CareerSection rows={p.seasonTotals ?? []} goalie={p.isGoalie} primaryLeague={p.primaryLeague ?? (p.league ?? '').toUpperCase()} totals={p.careerTotals} />
         </ScrollView>
       )}
     </View>
@@ -41,8 +44,15 @@ export default function PlayerScreen() {
 
 function Hero({ p }: { p: PlayerDetail }) {
   const t = useTheme();
-  const { isFavoritePlayer, togglePlayer } = useFavorites();
-  const on = isFavoritePlayer(p.id);
+  const { loaded, isFavoritePlayer, togglePlayer, renamePlayer } = useFavorites();
+  // One key per player, whichever route opened the page (see canonicalPlayerKey). A star placed
+  // under the old "nhl-{id}" key is moved onto it on the first visit, so it keeps reading "on".
+  const key = canonicalPlayerKey(p);
+  const legacy = p.id !== key ? p.id : null;
+  useEffect(() => {
+    if (loaded && legacy && isFavoritePlayer(legacy)) renamePlayer(legacy, key);
+  }, [loaded, legacy, key, isFavoritePlayer, renamePlayer]);
+  const on = isFavoritePlayer(key) || (!!legacy && isFavoritePlayer(legacy));
   const teamId = p.teamHref?.startsWith('/teams/') ? p.teamHref.slice('/teams/'.length) : undefined;
   return (
     <View style={styles.hero}>
@@ -85,7 +95,7 @@ function Hero({ p }: { p: PlayerDetail }) {
           )
         ) : null}
       </View>
-      <Pressable onPress={() => togglePlayer(p.id)} hitSlop={10} accessibilityLabel={on ? 'Remove favorite' : 'Add favorite'}>
+      <Pressable onPress={() => togglePlayer(key)} hitSlop={10} accessibilityLabel={on ? 'Remove favorite' : 'Add favorite'}>
         <SymbolView name={on ? 'star.fill' : 'star'} tintColor={on ? '#f5a623' : t.subtle} size={26} />
       </Pressable>
     </View>

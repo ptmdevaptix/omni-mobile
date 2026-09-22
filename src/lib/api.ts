@@ -63,6 +63,10 @@ export function teamHeaderPath(rawId: string): string {
   // "cjra-bchl-16" → /cjra-team/bchl-16. The league stays in the path because the six are separate
   // HockeyTech clients; the id alone would not say which one to ask.
   if (teamId.startsWith("cjra-")) return `/cjra-team/${teamId.slice(5)}`;
+  // Europe: "shl-fbk", "liiga-jyp", "elh-sparta" — the id after the prefix is the club's code or slug.
+  if (teamId.startsWith("shl-")) return `/shl-team/${teamId.slice(4)}`;
+  if (teamId.startsWith("liiga-")) return `/liiga-team/${teamId.slice(6)}`;
+  if (teamId.startsWith("elh-")) return `/elh-team/${teamId.slice(4)}`;
   return `/team/${teamId}`;
 }
 
@@ -76,5 +80,10 @@ export function leagueOf(rawId: string): string {
   // The BLOCK, not the individual league — teamTabs and the rest ask this to decide what a club
   // shows, and the answer is the same for all six.
   if (teamId.startsWith("cjra-")) return "CJRA";
+  // The MEMBER, not a "EURO" block: games, teams and favorites are tagged by league on the web
+  // too, and the Euro pill exists only in the picker.
+  if (teamId.startsWith("shl-")) return "SHL";
+  if (teamId.startsWith("liiga-")) return "LIIGA";
+  if (teamId.startsWith("elh-")) return "ELH";
   return "NHL";
 }

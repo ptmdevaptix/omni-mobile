@@ -75,12 +75,6 @@ export function mmss(sec?: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// Place/city name from a full "Place Nickname" team name (drops the last word). Best-effort — two-word
-// nicknames (e.g. "Wheat Kings") leave an extra word; fine for AHL/CHL standings display.
-export function placeName(fullName: string): string {
-  const parts = (fullName || '').trim().split(/\s+/);
-  return parts.length > 1 ? parts.slice(0, -1).join(' ') : fullName;
-}
 
 export function pct3(v?: number): string {
   if (v == null) return '—';

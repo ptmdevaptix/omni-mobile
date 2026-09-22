@@ -12,9 +12,10 @@ export type TeamTab = 'home' | 'schedule' | 'roster' | 'stats' | 'prospects' | '
 // USHL coverage picks up.
 export function teamTabs(teamId: string): TeamTab[] {
   const league = leagueOf(teamId);
-  // ECHL: no feed behind the club beyond a seeded schedule and a roster — no home stats, no leaders,
-  // no news scanner coverage. Matches what the web's ECHL team pages carry.
-  if (league === 'ECHL') return ['schedule', 'roster'];
+  // ECHL and Europe: Home (the table and the games either side of today, from /home), schedule and
+  // roster. No stats tab — neither the ECHL nor the three European leagues publish a per-club stats
+  // feed — and no news, which the scanner does not cover for these clubs.
+  if (league === 'ECHL' || league === 'SHL' || league === 'LIIGA' || league === 'ELH') return ['home', 'schedule', 'roster'];
   if (league === 'USHL') return ['home', 'schedule', 'roster', 'stats'];
   // Canadian Jr A: everything except News. Not a judgement about coverage — /cjra-team/<id>/news does
   // not exist on the API and returns the 404 HTML page, so the tab would error rather than sit empty.
