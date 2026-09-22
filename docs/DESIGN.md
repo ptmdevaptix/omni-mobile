@@ -150,11 +150,14 @@ Legend: **P**=phone, **T**=iPad adaptation noted in §8. ✅ v1, 🕒 fast-follo
   `/chl-playoffs/{league}`, `/ncaa-tournament`).
 - Tap row → **Team Hub**. APIs per §5.
 
-### 6.4 Stats / Leaders (tab, ✅)
-- League picker + Skaters/Goalies segmented control.
-- `StatLeaderRow` list (rank, player, team, key stat columns). Tap → player (NHL) / team.
-- 🕒 sortable columns / category picker. APIs: `/nhl-stats`, `/ahl-stats`, `/chl-stats/{league}`,
-  `/ncaa-stats`.
+### 6.4 Stats / Leaders (tab, ✅ built Sep 2026 — took the News slot; News lives under More)
+- League picker + Skaters/Goalies segmented control + season switch; NCAA adds a conference row.
+- One table for every feed (`components/stats-table`): rank and player frozen, the numbers scroll
+  sideways, any column sorts; rate columns qualify on 20% of the season played (`lib/stat-qualifiers`).
+- A block (CHL, Canadian Jr A) is a combined board of the followed members — the started leagues only,
+  columns every league can fill, a rate floor per league; Europe resolves to a member.
+- APIs, normalized in `lib/stats`: `/nhl-stats?type=`, `/ahl-stats`, `/ht-stats/{league}`,
+  `/euro-stats/{league}`, `/ncaa-stats`. The ECHL has no feed and says so.
 
 ### 6.5 Teams (tab, ✅)
 - League picker + **search bar** (teams + players).

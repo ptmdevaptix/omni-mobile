@@ -51,9 +51,14 @@ export default function TabsLayout() {
             ...leagueChrome,
           }}
         />
+        {/* Stats takes the fourth slot; News moved to More (Sep 2026). */}
         <Tabs.Screen
-          name="news"
-          options={{ title: 'News', tabBarIcon: ({ color, size }) => <TabIcon name="newspaper.fill" color={color} size={size} /> }}
+          name="stats"
+          options={{
+            title: 'Stats',
+            tabBarIcon: ({ color, size }) => <TabIcon name="chart.bar.fill" color={color} size={size} />,
+            ...leagueChrome,
+          }}
         />
         <Tabs.Screen
           name="more"

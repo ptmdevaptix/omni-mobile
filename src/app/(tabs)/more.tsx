@@ -4,12 +4,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useTheme } from '@/lib/theme';
 
-// Phase 3 fills these in. "Teams" is live now (browser reached here per the nav design); the rest are stubs.
-// NB: the `Leaders` row is intentionally omitted until src/app/leaders.tsx renders real data — a reachable
-// "coming soon" screen is a App Review rejection risk (Guideline 2.1, placeholder content). The route still
-// exists; re-add { label: 'Leaders', icon: 'chart.bar.fill', href: '/leaders' } once it's built out.
+// News moved here from the tab bar when Stats took its slot (Sep 2026).
 type Row = { label: string; icon: SymbolViewProps['name']; href?: string };
 const ROWS: Row[] = [
+  { label: 'News', icon: 'newspaper.fill', href: '/news' },
   { label: 'Teams', icon: 'shield.lefthalf.filled', href: '/teams' },
   { label: 'Favorites', icon: 'star.fill', href: '/favorites' },
   { label: 'Following', icon: 'list.bullet', href: '/following' },
