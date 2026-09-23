@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -118,22 +118,40 @@ export default function GameScreen() {
   );
 }
 
+/**
+ * A club's crest and name on the scoreboard, tappable through to its team page when we know which
+ * page that is.
+ *
+ * Linked or not, it is ONE node carrying the row's style. It used to wrap the linked case in an
+ * extra Link and Pressable, which laid the row out differently from the unlinked one: the crest
+ * survived and everything else collapsed to nothing. That only showed when a game was opened from a
+ * card, because a card passes the team ids and nothing else does — so the broken path was the one
+ * every reader took and the working one was the only one easy to test.
+ */
 function TeamName({ team, routeId }: { team: GDTeam; routeId?: string }) {
   const t = useTheme();
   // The full name, composed the one way a full name is built — a repeat (HV71 HV71) collapses.
   const label = composeTeamName(team.name, team.nickname) || team.abbr;
-  const inner = (
-    <View style={styles.teamRow}>
+  const body = (
+    <>
       <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={36} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 17, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
       </View>
-    </View>
+    </>
   );
-  if (!routeId) return inner;
+  if (!routeId) return <View style={styles.teamRow}>{body}</View>;
   // Canonicalise: these ids come from the scoreboard, where CHL teams are keyed by league code
   // ("qmjhl-2") rather than the client code the /teams route and its endpoint expect.
-  return <Link href={{ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(routeId) } }} asChild><Pressable style={{ flex: 1 }}>{inner}</Pressable></Link>;
+  return (
+    <Pressable
+      style={styles.teamRow}
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      onPress={() => router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(routeId) } })}>
+      {body}
+    </Pressable>
+  );
 }
 
 function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; homeId?: string }) {
