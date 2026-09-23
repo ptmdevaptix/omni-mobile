@@ -9,7 +9,7 @@ import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
 import { shortDate } from '@/lib/format';
-import { fetchFollowSummary, type SummaryGoalie, type SummarySkater } from '@/lib/follow-summary';
+import { fetchFollowSummary, type NextGame, type SummaryGoalie, type SummarySkater } from '@/lib/follow-summary';
 import { useTheme } from '@/lib/theme';
 
 /**
@@ -137,6 +137,25 @@ const Num = ({ v, w = 30, strong }: { v?: number | string | null; w?: number; st
   );
 };
 
+/**
+ * A season row for someone yet to play. Noughts across six columns say nothing a reader wants; when
+ * his club next takes the ice does, so it takes the whole line.
+ */
+function NextGameLine({ g }: { g: NextGame }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
+      <Text style={{ color: t.subtle, fontSize: 11 }} numberOfLines={1}>
+        {shortDate(g.date)} {g.isHome ? 'vs' : 'at'}
+      </Text>
+      <TeamLogo uri={g.opponentLogo} size={15} />
+      <Text style={{ color: t.sub, fontSize: 11, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>
+        {g.opponentAbbr || g.opponentName}
+      </Text>
+    </View>
+  );
+}
+
 const Head = ({ label, w = 30 }: { label: string; w?: number }) => {
   const t = useTheme();
   return <Text style={{ width: w, textAlign: 'right', fontSize: 10, fontWeight: '700', letterSpacing: 0.3, color: t.sub }}>{label}</Text>;
@@ -161,6 +180,8 @@ function SkaterTable({ rows, season }: { rows: SummarySkater[]; season: boolean 
           {/* A row of zeroes would read as a player who took a regular shift and did nothing. */}
           {r.dnp ? (
             <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
+          ) : season && !r.gp && r.nextGame ? (
+            <NextGameLine g={r.nextGame} />
           ) : (
             <>
               {season ? <Num v={r.gp} /> : null}
@@ -195,6 +216,8 @@ function GoalieTable({ rows, season }: { rows: SummaryGoalie[]; season: boolean 
           <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} gameId={r.gameId} dnp={r.dnp} />
           {r.dnp && !season ? (
             <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
+          ) : season && !r.gp && r.nextGame ? (
+            <NextGameLine g={r.nextGame} />
           ) : season ? (
             <>
               <Num v={r.gp} /><Num v={r.w} w={26} /><Num v={r.l} w={26} /><Num v={r.otl} w={30} />
