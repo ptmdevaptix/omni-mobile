@@ -100,6 +100,9 @@ export async function postRegistration(
         mutedTeams: prefs.mutedTeams,
         players,
         prospectOrgs,
+        // Exceptions only; the server fills in each follow's default for the rest.
+        playerAlerts: prefs.playerAlerts,
+        prospectAlerts: prefs.prospectAlerts,
       }),
     });
     return res.ok;
@@ -192,6 +195,7 @@ export function usePushSync() {
   // Every subscription is in the signature, or following a player would never reach the server.
   const signature = JSON.stringify({
     e: prefs.enabled, v: prefs.events, m: prefs.mutedTeams, t: favorites, p: favoritePlayers, o: orgs,
+    pa: prefs.playerAlerts, oa: prefs.prospectAlerts,
   });
 
   useEffect(() => {

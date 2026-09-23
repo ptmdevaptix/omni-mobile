@@ -7,6 +7,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { alertOverrides, resolveAlerts, type PersonAlerts, type PersonEvent } from '@/lib/player-alerts';
+
 const KEY = 'notificationPrefs';
 
 // The four toggles the user asked for. "start" covers both the 10-minute warning and puck drop;
@@ -27,12 +29,21 @@ export type NotificationPrefs = {
   events: Record<NotificationEvent, boolean>;
   /** Favorite team ids explicitly silenced. Teams are ON by default, so absence means enabled. */
   mutedTeams: string[];
+  /**
+   * What to hear about each person followed, as EXCEPTIONS to that follow's default. Absent means
+   * the default — everything for a player starred by name, goals/assists/finals for a whole org —
+   * so a reader who never opens these switches stores nothing.
+   */
+  playerAlerts: Record<string, Partial<PersonAlerts>>;
+  prospectAlerts: Record<string, Partial<PersonAlerts>>;
 };
 
 export const DEFAULT_PREFS: NotificationPrefs = {
   enabled: false, // opt-in: nothing is sent until the user turns it on and grants permission
   events: { start: true, goal: true, period: true, final: true },
   mutedTeams: [],
+  playerAlerts: {},
+  prospectAlerts: {},
 };
 
 function normalise(raw: unknown): NotificationPrefs {
@@ -42,6 +53,8 @@ function normalise(raw: unknown): NotificationPrefs {
     enabled: typeof p.enabled === 'boolean' ? p.enabled : DEFAULT_PREFS.enabled,
     events,
     mutedTeams: Array.isArray(p.mutedTeams) ? p.mutedTeams.filter((x) => typeof x === 'string') : [],
+    playerAlerts: (p.playerAlerts ?? {}) as Record<string, Partial<PersonAlerts>>,
+    prospectAlerts: (p.prospectAlerts ?? {}) as Record<string, Partial<PersonAlerts>>,
   };
 }
 
@@ -52,6 +65,9 @@ const Ctx = createContext<{
   setEvent: (key: NotificationEvent, on: boolean) => void;
   setTeamEnabled: (teamId: string, on: boolean) => void;
   isTeamEnabled: (teamId: string) => boolean;
+  /** The switches for one followed person, with their defaults filled in. */
+  alertsFor: (id: string, kind: 'starred' | 'prospect') => PersonAlerts;
+  setAlert: (id: string, kind: 'starred' | 'prospect', event: PersonEvent, on: boolean) => void;
 }>({
   prefs: DEFAULT_PREFS,
   ready: false,
@@ -59,6 +75,8 @@ const Ctx = createContext<{
   setEvent: () => {},
   setTeamEnabled: () => {},
   isTeamEnabled: () => true,
+  alertsFor: (_id, kind) => resolveAlerts(undefined, kind),
+  setAlert: () => {},
 });
 
 export function NotificationPrefsProvider({ children }: { children: ReactNode }) {
@@ -93,6 +111,18 @@ export function NotificationPrefsProvider({ children }: { children: ReactNode })
         mutedTeams: on ? p.mutedTeams.filter((id) => id !== teamId) : [...new Set([...p.mutedTeams, teamId])],
       })),
     isTeamEnabled: (teamId: string) => !prefs.mutedTeams.includes(teamId),
+    alertsFor: (id: string, kind: 'starred' | 'prospect') =>
+      resolveAlerts(kind === 'starred' ? prefs.playerAlerts[id] : prefs.prospectAlerts[id], kind),
+    // Only the exceptions are stored, so changing a default later moves everyone who never chose.
+    setAlert: (id: string, kind: 'starred' | 'prospect', event: PersonEvent, on: boolean) =>
+      update((p) => {
+        const field = kind === 'starred' ? 'playerAlerts' : 'prospectAlerts';
+        const next = { ...resolveAlerts(p[field][id], kind), [event]: on };
+        const diff = alertOverrides(next, kind);
+        const map = { ...p[field] };
+        if (Object.keys(diff).length) map[id] = diff; else delete map[id];
+        return { ...p, [field]: map };
+      }),
   }), [prefs, ready]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
