@@ -7,6 +7,8 @@ import { useTheme } from '@/lib/theme';
 // News moved here from the tab bar when Stats took its slot (Sep 2026).
 type Row = { label: string; icon: SymbolViewProps['name']; href?: string };
 const ROWS: Row[] = [
+  // The nightly read for anyone following people rather than clubs.
+  { label: 'My Players', icon: 'person.2.fill', href: '/summary' },
   { label: 'News', icon: 'newspaper.fill', href: '/news' },
   { label: 'Teams', icon: 'shield.lefthalf.filled', href: '/teams' },
   { label: 'Favorites', icon: 'star.fill', href: '/favorites' },
