@@ -21,9 +21,33 @@ import { composeTeamName } from '@/lib/team-name';
 import { useTheme } from '@/lib/theme';
 import { useDerivedClubs } from '@/lib/use-follows';
 
+/**
+ * The date a game is played, for a feed that does not send one.
+ *
+ * The NCAA's does not: its games have no start time at all, so an upcoming one could only say
+ * "Upcoming", which the reader already knew from opening it. Our own id for those games carries the
+ * date — ncaa-20261002-alas-anchorage-denver — so it is read back from there rather than left out.
+ */
+function dateFromGameId(id?: string): string | undefined {
+  const m = /-(\d{4})(\d{2})(\d{2})(?:-|$)/.exec(id ?? '');
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : undefined;
+}
+
 /** The iOS navigation bar's own height, under the status bar, and the clearance its buttons need. */
 const NAV_ROW = 44;
 const SIDE_CLEAR = 62;
+
+/**
+ * What the band says: the clock while a game is on, FINAL once it is over, and before it starts the
+ * date and the face-off time. A generic "Upcoming" is dropped when there is a date to show instead —
+ * it says nothing the date does not — and kept when there is not.
+ */
+function bandLabel(g: GameDetail, gameId: string): string {
+  if (g.status !== 'UPCOMING') return g.statusLabel ?? '';
+  const when = shortDate(g.startTimeUTC) || shortDate(dateFromGameId(gameId));
+  const label = /^upcoming$/i.test((g.statusLabel ?? '').trim()) ? '' : g.statusLabel ?? '';
+  return [when, when && label === when ? '' : label].filter(Boolean).join(' · ') || g.statusLabel || '';
+}
 
 export default function GameScreen() {
   const t = useTheme();
@@ -56,7 +80,7 @@ export default function GameScreen() {
           adjustsFontSizeToFit
           minimumFontScale={0.85}
           style={{ color: g?.status === 'LIVE' ? t.live : t.text, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>
-          {g ? (g.status === 'UPCOMING' ? [shortDate(g.startTimeUTC), g.statusLabel].filter(Boolean).join(' · ') : g.statusLabel) : ''}
+          {g ? bandLabel(g, gameId) : ''}
         </Text>
       </View>
       {/* The two clubs sit in the same block as the state above them, the way the team page's crest
