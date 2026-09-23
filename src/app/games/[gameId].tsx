@@ -8,8 +8,10 @@ import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
-import { shortDate, timeOfDay } from '@/lib/format';
+import { shortDate } from '@/lib/format';
 import { followedLabel, followedOnGame, type FollowedOnGame } from '@/lib/follows';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { GamePreview } from '@/components/game-preview';
 import { GameRosters } from '@/components/game-rosters';
 import { useFollowedMatcher } from '@/lib/use-follows';
@@ -19,8 +21,13 @@ import { composeTeamName } from '@/lib/team-name';
 import { useTheme } from '@/lib/theme';
 import { useDerivedClubs } from '@/lib/use-follows';
 
+/** The iOS navigation bar's own height, under the status bar, and the clearance its buttons need. */
+const NAV_ROW = 44;
+const SIDE_CLEAR = 62;
+
 export default function GameScreen() {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const { gameId, away, home } = useLocalSearchParams<{ gameId: string; away?: string; home?: string }>();
 
   const [tab, setTab] = useState('Summary');
@@ -38,7 +45,20 @@ export default function GameScreen() {
   const hasBox = !!r && [r.away, r.home].some((x) => x.forwards.length || x.defense.length || x.goalies.length);
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <Stack.Screen options={{ title: g ? `${g.awayTeam.abbr} @ ${g.homeTeam.abbr}` : 'Game' }} />
+      {/* The bar is transparent and untitled: "NYI @ NYR" only repeated the two rows below it, so
+          the band carries what a reader actually opens a game for — the period and the clock, or
+          the date it starts, or that it is over. */}
+      <Stack.Screen options={{ title: '', headerTransparent: true, headerShadowVisible: false }} />
+
+      <View style={[styles.statusBand, { height: NAV_ROW + insets.top, paddingTop: insets.top }]}>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+          style={{ color: g?.status === 'LIVE' ? t.live : t.text, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>
+          {g ? (g.status === 'UPCOMING' ? [shortDate(g.startTimeUTC), g.statusLabel].filter(Boolean).join(' · ') : g.statusLabel) : ''}
+        </Text>
+      </View>
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError || !g ? (
@@ -93,7 +113,7 @@ function TeamName({ team, routeId }: { team: GDTeam; routeId?: string }) {
 function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; homeId?: string }) {
   const t = useTheme();
   const played = g.status !== 'UPCOMING';
-  const live = g.status === 'LIVE';
+  const where = [g.seriesInfo, g.venue, g.venueLocation].filter(Boolean).join(' · ');
   const row = (team: GDTeam, id?: string) => (
     <View style={styles.sbRow}>
       <TeamName team={team} routeId={id} />
@@ -102,12 +122,13 @@ function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; hom
   );
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-      <Text style={{ color: live ? t.live : t.sub, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{g.statusLabel}</Text>
       {row(g.awayTeam, awayId)}
       {row(g.homeTeam, homeId)}
-      <Text style={{ color: t.subtle, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
-        {[g.seriesInfo, g.venue, g.venueLocation, g.network && `📺 ${g.network}`].filter(Boolean).join(' · ')}
-      </Text>
+      {/* Where it is played and where to watch it are two different questions, and running them
+          together wrapped mid-answer — "Scotiabank Arena · Toronto, ON · 📺" and then the channel
+          alone on the next line. A line each. */}
+      {where ? <Text style={{ color: t.subtle, fontSize: 12, textAlign: 'center', marginTop: 4 }}>{where}</Text> : null}
+      {g.network ? <Text style={{ color: t.subtle, fontSize: 12, textAlign: 'center', marginTop: 2 }}>📺 {g.network}</Text> : null}
     </View>
   );
 }
@@ -171,7 +192,6 @@ function Upcoming({ g }: { g: GameDetail }) {
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
       <Text style={[styles.section, { color: t.sub }]}>PREVIEW</Text>
-      {g.startTimeUTC ? <Text style={{ color: t.text, fontSize: 14, marginBottom: 8 }}>{shortDate(g.startTimeUTC)} · {timeOfDay(g.startTimeUTC)}</Text> : null}
       {g.previewTitle ? (
         <Text style={{ color: t.text, fontSize: 17, fontWeight: '800', lineHeight: 22, marginBottom: 4 }}>{g.previewTitle}</Text>
       ) : null}
@@ -298,6 +318,9 @@ function PenaltyRow({ pen, logo, darkLogo }: { pen: PenaltyInfo; logo?: string; 
 }
 
 const styles = StyleSheet.create({
+  // The navigation band, wearing the game's state. Padded clear of the back button on both sides so
+  // the text sits in the middle of the screen rather than the middle of what is left of it.
+  statusBand: { justifyContent: 'center', paddingHorizontal: SIDE_CLEAR },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 4 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
   sbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
