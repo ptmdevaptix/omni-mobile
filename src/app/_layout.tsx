@@ -9,6 +9,7 @@ import { CompactModeProvider } from '@/lib/compact';
 import { FavoritesProvider } from '@/lib/favorites';
 import { FollowedLeaguesProvider } from '@/lib/followed-leagues';
 import { NotificationPrefsProvider } from '@/lib/notification-prefs';
+import { PreferenceTelemetry } from '@/lib/pref-telemetry';
 import { useNotificationTaps, usePushSync } from '@/lib/push';
 import { queryClient } from '@/lib/query';
 import { ThemeModeProvider, navTheme, useThemeMode } from '@/lib/theme';
@@ -63,6 +64,9 @@ export default function RootLayout() {
             <FollowedLeaguesProvider>
               <NotificationPrefsProvider>
                 <RootNav />
+                {/* Renders nothing: it counts how many people follow each team, player and league,
+                    gated on the same regional answer that gates analytics on the web. */}
+                <PreferenceTelemetry />
               </NotificationPrefsProvider>
             </FollowedLeaguesProvider>
           </FavoritesProvider>
