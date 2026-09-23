@@ -4,15 +4,21 @@ import { api } from './api';
 
 export type SummarySkater = {
   key: string; name: string; club?: string; clubLogo?: string; league?: string;
+  /** The NHL club holding his rights, for the crest beside his name. */
+  nhlTeam?: string;
   gp?: number; g: number; a: number; pts: number; plusMinus?: number; pim: number;
   gameId?: string;
+  /** Day only: his club played and he did not dress. */
+  dnp?: boolean;
 };
 
 export type SummaryGoalie = {
   key: string; name: string; club?: string; clubLogo?: string; league?: string;
+  nhlTeam?: string;
   gp?: number; gs?: number; ga: number; sa: number; svPct?: number; so?: number;
   w?: number; l?: number; otl?: number; gaa?: number;
   gameId?: string;
+  dnp?: boolean;
 };
 
 export type FollowSummary = {

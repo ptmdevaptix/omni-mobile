@@ -3,11 +3,12 @@ import { Link, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { NhlCrest } from '@/components/nhl-crest';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
-import { dayKey } from '@/lib/format';
+import { shortDate } from '@/lib/format';
 import { fetchFollowSummary, type SummaryGoalie, type SummarySkater } from '@/lib/follow-summary';
 import { useTheme } from '@/lib/theme';
 
@@ -26,11 +27,12 @@ export default function SummaryScreen() {
   const { favoritePlayers, prospectFollows, loaded } = useFavorites();
   const [scope, setScope] = useState<'Today' | 'Season'>('Today');
   const orgs = prospectFollows.map((f) => f.team);
-  const today = dayKey();
 
+  // No date is sent: which day counts is the server's call, and it turns over at 2am Eastern so a
+  // west-coast game that ended after midnight is still part of the night you were watching.
   const q = useQuery({
-    queryKey: ['follow-summary', scope, favoritePlayers.join(','), orgs.join(','), today],
-    queryFn: () => fetchFollowSummary(favoritePlayers, orgs, scope === 'Season' ? 'season' : 'day', today),
+    queryKey: ['follow-summary', scope, favoritePlayers.join(','), orgs.join(',')],
+    queryFn: () => fetchFollowSummary(favoritePlayers, orgs, scope === 'Season' ? 'season' : 'day'),
     enabled: loaded && (favoritePlayers.length > 0 || orgs.length > 0),
     staleTime: 5 * 60_000,
   });
@@ -65,11 +67,15 @@ export default function SummaryScreen() {
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
           {/* The day is not over until their last game is. Saying so beats a table that quietly
               grows while the reader is looking at it. */}
-          {!season && d.pending > 0 ? (
-            <Text style={{ color: t.subtle, fontSize: 12 }}>
-              {d.pending} {d.pending === 1 ? 'game' : 'games'} still to finish — this fills in as they do.
-            </Text>
-          ) : null}
+          {/* Which day this is. The list can be last night's well into this morning, so it says so
+              rather than leaving the reader to assume. */}
+          <Text style={{ color: t.subtle, fontSize: 12 }}>
+            {season
+              ? `${d.season ?? ''} season`.trim()
+              : [d.date ? shortDate(d.date) : null,
+                 d.pending > 0 ? `${d.pending} ${d.pending === 1 ? 'game' : 'games'} still to finish` : null,
+                ].filter(Boolean).join(' · ')}
+          </Text>
 
           {d.skaters.length ? <SkaterTable rows={d.skaters} season={season} /> : null}
           {d.goalies.length ? <GoalieTable rows={d.goalies} season={season} /> : null}
@@ -79,15 +85,20 @@ export default function SummaryScreen() {
   );
 }
 
-function NameCell({ name, club, clubLogo, league, gameId }: {
-  name: string; club?: string; clubLogo?: string; league?: string; gameId?: string;
+function NameCell({ name, club, clubLogo, league, nhlTeam, gameId, dnp }: {
+  name: string; club?: string; clubLogo?: string; league?: string; nhlTeam?: string; gameId?: string; dnp?: boolean;
 }) {
   const t = useTheme();
   const body = (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <TeamLogo uri={clubLogo} size={22} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: t.text, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Text style={{ color: dnp ? t.sub : t.text, fontSize: 14, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{name}</Text>
+          {/* The club that holds his rights, which for a prospect is not the club he plays for —
+              the same crest the prospects page puts beside him. */}
+          {nhlTeam ? <NhlCrest abbr={nhlTeam} size={14} /> : null}
+        </View>
         <Text style={{ color: t.subtle, fontSize: 10.5 }} numberOfLines={1}>
           {[league, club].filter(Boolean).join(' · ')}
         </Text>
@@ -145,13 +156,20 @@ function SkaterTable({ rows, season }: { rows: SummarySkater[]; season: boolean 
     >
       {rows.map((r) => (
         <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
-          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} gameId={r.gameId} />
-          {season ? <Num v={r.gp} /> : null}
-          <Num v={r.g} strong={r.g > 0} />
-          <Num v={r.a} strong={r.a > 0} />
-          <Num v={r.pts} strong={r.pts > 0} />
-          <Num v={plus(r.plusMinus)} />
-          <Num v={r.pim} />
+          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} gameId={r.gameId} dnp={r.dnp} />
+          {/* A row of zeroes would read as a player who took a regular shift and did nothing. */}
+          {r.dnp ? (
+            <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
+          ) : (
+            <>
+              {season ? <Num v={r.gp} /> : null}
+              <Num v={r.g} strong={r.g > 0} />
+              <Num v={r.a} strong={r.a > 0} />
+              <Num v={r.pts} strong={r.pts > 0} />
+              <Num v={plus(r.plusMinus)} />
+              <Num v={r.pim} />
+            </>
+          )}
         </View>
       ))}
     </Card>
@@ -173,8 +191,10 @@ function GoalieTable({ rows, season }: { rows: SummaryGoalie[]; season: boolean 
     >
       {rows.map((r) => (
         <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
-          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} gameId={r.gameId} />
-          {season ? (
+          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} gameId={r.gameId} dnp={r.dnp} />
+          {r.dnp && !season ? (
+            <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
+          ) : season ? (
             <>
               <Num v={r.gp} /><Num v={r.w} w={26} /><Num v={r.l} w={26} /><Num v={r.otl} w={30} />
               <Num v={r.so} w={26} /><Num v={r.gaa?.toFixed(2)} w={38} /><Num v={pct(r.svPct)} w={40} strong />
