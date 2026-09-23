@@ -51,7 +51,6 @@ export function GamePreview({ gameId, away, home }: { gameId: string; away: GDTe
       {hasForm ? (
         <Card title="LAST 5">
           <Form abbr={away.abbr} games={d.awayLast5 ?? []} />
-          <View style={{ height: 10 }} />
           <Form abbr={home.abbr} games={d.homeLast5 ?? []} />
         </Card>
       ) : null}
@@ -192,37 +191,50 @@ function SeriesRow({ g }: { g: SeriesGame }) {
   );
 }
 
-/** A club's last five, as a row of W/L pills with the scores beneath — a phone's version of a table. */
+/**
+ * A club's recent form as a row of coloured squares — won, lost, lost past regulation — newest on
+ * the right. No opponents and no scores: at a glance this answers "how are they going", and the
+ * schedule answers everything else. It was three stacked lines a club before, for five games.
+ *
+ * A club with fewer games than the strip is long gets grey squares for the ones it has not played,
+ * so every club's row is the same width and a short row cannot be mistaken for a bad one.
+ */
+const STRIP = 5;
+const RESULT_COLOR: Record<string, string> = { W: '#10b981', L: '#ef4444', OTL: '#f59e0b' };
+
 function Form({ abbr, games }: { abbr: string; games: ScheduleGame[] }) {
   const t = useTheme();
-  if (!games.length) return null;
+  // Oldest first, so the row reads left to right the way a season does.
+  const played = [...games]
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    .slice(-STRIP);
+  const cells: (string | null)[] = [
+    ...Array(Math.max(0, STRIP - played.length)).fill(null),
+    ...played.map((g) => g.result ?? resultOf(g)),
+  ];
   return (
-    <View>
-      <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700', marginBottom: 4 }}>{abbr}</Text>
-      {/* Fixed-width columns, not flex: a club with two games played would otherwise spread those
-          two across the whole card and read as a five-game row with holes in it. */}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {games.map((g, i) => {
-          const us = g.teamScore, them = g.opponentScore;
-          const won = us != null && them != null && us > them;
-          const tone = us == null || them == null ? t.subtle : won ? '#10b981' : '#ef4444';
-          return (
-            <View key={i} style={{ width: 52, alignItems: 'center', gap: 2 }}>
-              <View style={{ backgroundColor: `${tone}1f`, borderColor: `${tone}66`, borderWidth: StyleSheet.hairlineWidth, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                <Text style={{ color: tone, fontSize: 11, fontWeight: '800' }}>{us == null || them == null ? '–' : won ? 'W' : 'L'}</Text>
-              </View>
-              <Text style={{ color: t.subtle, fontSize: 10 }} numberOfLines={1}>
-                {us == null || them == null ? '' : `${us}-${them}`}
-              </Text>
-              <Text style={{ color: t.subtle, fontSize: 9 }} numberOfLines={1}>
-                {g.isHome ? '' : '@'}{g.opponentAbbr}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 }}>
+      <Text style={{ width: 42, color: t.sub, fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{abbr}</Text>
+      {cells.map((r, i) => (
+        <View
+          key={i}
+          accessibilityLabel={r ? `Game ${i + 1}: ${r}` : `Game ${i + 1}: not played`}
+          style={{
+            width: 22, height: 14, borderRadius: 3,
+            backgroundColor: r ? RESULT_COLOR[r] ?? t.border : t.border,
+            opacity: r ? 1 : 0.5,
+          }}
+        />
+      ))}
     </View>
   );
+}
+
+/** A feed that reports scores but no result letter still tells us who won; overtime it does not. */
+function resultOf(g: ScheduleGame): string | null {
+  if (g.teamScore == null || g.opponentScore == null) return null;
+  if (g.teamScore > g.opponentScore) return 'W';
+  return g.overtime ? 'OTL' : 'L';
 }
 
 function fmtDate(d: string): string {

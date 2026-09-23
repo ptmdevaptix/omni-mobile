@@ -59,18 +59,20 @@ export default function GameScreen() {
           {g ? (g.status === 'UPCOMING' ? [shortDate(g.startTimeUTC), g.statusLabel].filter(Boolean).join(' · ') : g.statusLabel) : ''}
         </Text>
       </View>
+      {/* The two clubs sit in the same block as the state above them, the way the team page's crest
+          and name sit with theirs — one top section, not a band and then a floating card. */}
+      {g ? <Scoreboard g={g} awayId={away} homeId={home} /> : null}
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError || !g ? (
         <StateView kind="empty" title="Game details unavailable" message="We couldn’t load this game." onRetry={() => q.refetch()} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
-          <Scoreboard g={g} awayId={away} homeId={home} />
           {followed.length ? <FollowedStrip followed={followed} /> : null}
           {g.periodScores?.length ? <LineScore g={g} /> : null}
           {g.status === 'UPCOMING' ? (
             <>
-              <Upcoming g={g} />
+              {g.preview || g.previewTitle || g.previewSummary ? <Upcoming g={g} /> : null}
               <GamePreview gameId={gameId} away={g.awayTeam} home={g.homeTeam} />
               {/* Pregame NHL scratches arrive before the box score does — on their own until then. */}
               {!hasBox && g.scratches && (g.scratches.away.length || g.scratches.home.length) ? <ScratchesCard g={g} followed={followed} /> : null}
@@ -121,7 +123,7 @@ function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; hom
     </View>
   );
   return (
-    <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+    <View style={[styles.matchup, { borderBottomColor: t.border }]}>
       {row(g.awayTeam, awayId)}
       {row(g.homeTeam, homeId)}
       {/* Where it is played and where to watch it are two different questions, and running them
@@ -203,9 +205,7 @@ function Upcoming({ g }: { g: GameDetail }) {
         g.preview.split(/\n\s*\n/).filter(Boolean).map((para, i) => (
           <Text key={i} style={{ color: t.text, fontSize: 14, lineHeight: 21, marginTop: i ? 10 : 0 }}>{para.trim()}</Text>
         ))
-      ) : g.previewTitle || g.previewSummary ? null : (
-        <Text style={{ color: t.subtle, fontSize: 14, lineHeight: 21 }}>A preview for this game isn’t available yet.</Text>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -321,6 +321,8 @@ const styles = StyleSheet.create({
   // The navigation band, wearing the game's state. Padded clear of the back button on both sides so
   // the text sits in the middle of the screen rather than the middle of what is left of it.
   statusBand: { justifyContent: 'center', paddingHorizontal: SIDE_CLEAR },
+  // No card chrome: it is the bottom half of the header, not the first thing on the page.
+  matchup: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 4 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
   sbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
