@@ -24,6 +24,7 @@ import { useDerivedClubs } from './use-follows';
  * "not placed yet" and "in a regulated region" both mean no — the safe direction, and the same
  * answer that visitor would get on the web before choosing.
  */
+const SHARE_KEY = 'omni:sharePrefs';
 const ANON_KEY = 'omni:anonId';
 const SENT_AT_KEY = 'omni:prefsSentAt';
 const REGULATED_KEY = 'omni:regulated';
@@ -53,6 +54,28 @@ async function anonId(): Promise<string | null> {
   } catch {
     return null;   // no storage means no stable id, and an unstable one would inflate every count
   }
+}
+
+/**
+ * The reader's own switch, which comes before the regional one.
+ *
+ * Counting what people follow is defensible and disclosed, but it happened whether or not anyone
+ * wanted it to, and outside a regulated region there was no way to decline. Off means off
+ * everywhere; it does not reach back and remove what was already counted, which the privacy policy
+ * says to ask us for.
+ */
+export async function isSharingPrefs(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(SHARE_KEY)) !== 'off';
+  } catch {
+    return true;   // same answer as a device that never touched the switch
+  }
+}
+
+export async function setSharingPrefs(on: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SHARE_KEY, on ? 'on' : 'off');
+  } catch { /* a device that cannot remember the choice keeps the default */ }
 }
 
 type Regulated = { value: boolean; at: number };
@@ -128,6 +151,8 @@ export function PreferenceTelemetry() {
       }
       lastSig.current = sig;
       if (!due) return;
+      // The reader's switch is asked first: it is a choice, where the regional check is a rule.
+      if (!(await isSharingPrefs())) return;
       if (!(await analyticsAllowed())) return;
       const id = await anonId();
       if (!id) return;

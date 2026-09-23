@@ -9,6 +9,7 @@ import { ProspectFollowToggle } from '@/components/prospect-follow-toggle';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { NOTIFICATION_EVENTS, useNotificationPrefs } from '@/lib/notification-prefs';
+import { isSharingPrefs, setSharingPrefs } from '@/lib/pref-telemetry';
 import { acquirePushToken, pushPermissionStatus, type PushPermission } from '@/lib/push';
 import { useTheme } from '@/lib/theme';
 
@@ -19,6 +20,11 @@ export default function SettingsScreen() {
   const { favorites, favoriteTeams, moveFavorite, toggle } = useFavorites();
   const { prefs, setEnabled, setEvent, setTeamEnabled, isTeamEnabled } = useNotificationPrefs();
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
+
+  // On by default, so it is read rather than assumed — a device that has declined must not show the
+  // switch on for the moment before storage answers.
+  const [sharing, setSharing] = useState(true);
+  useEffect(() => { isSharingPrefs().then(setSharing).catch(() => {}); }, []);
 
   // Favorites are stored as ids; names/logos come from the team directory. Falls back to the raw id
   // so the list still works (and stays reorderable) when the directory can't be reached.
@@ -175,6 +181,25 @@ export default function SettingsScreen() {
             </View>
           </>
         )}
+      </View>
+
+      {/* Privacy. Counting what people follow is disclosed in the policy, but it happened whether or
+          not anyone wanted it to; outside a region that requires consent there was no way to say no.
+          This is that way. */}
+      <View style={{ gap: 8 }}>
+        <Text style={[styles.header, { color: t.sub }]}>PRIVACY</Text>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+          <ToggleRow
+            label="Share anonymous counts"
+            detail="Lets us see which teams and players people follow. A random id and those lists — no account, no tracking, nothing that identifies you."
+            value={sharing}
+            onChange={(on) => { setSharing(on); setSharingPrefs(on); }}
+          />
+        </View>
+        <Text style={{ color: t.subtle, fontSize: 11 }}>
+          Turning this off stops any further counts from this device. To have what was already
+          counted removed, ask us at privacy@omnihockey.com.
+        </Text>
       </View>
     </ScrollView>
   );
