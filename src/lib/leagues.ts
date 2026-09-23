@@ -37,19 +37,21 @@ export type LeagueConfig = {
   statsPath: string; // "" = no leader boards for this league
   teamKind: "nhl" | "ahl" | "echl" | "chl" | "ushl" | "ncaa" | "cjra" | "euro"; // how to build a /teams/<id> route id from a standings row
   hasConferences?: boolean; // NCAA
+  /** The league's own mark, where one exists. Site-relative paths resolve through resolveLogo. */
+  logoUrl?: string;
 };
 
 export const LEAGUES: LeagueConfig[] = [
-  { id: "nhl", label: "NHL", name: "National Hockey League", scoresPath: "/scores", standingsPath: "/nhl-standings", standingsKind: "wlotl", statsPath: "/nhl-stats", teamKind: "nhl" },
-  { id: "ahl", label: "AHL", name: "American Hockey League", scoresPath: "/ahl-scores", standingsPath: "/ahl-standings", standingsKind: "wlotl", statsPath: "/ahl-stats", teamKind: "ahl" },
+  { id: "nhl", label: "NHL", name: "National Hockey League", scoresPath: "/scores", standingsPath: "/nhl-standings", standingsKind: "wlotl", statsPath: "/nhl-stats", teamKind: "nhl", logoUrl: "/nhl-logo.svg"},
+  { id: "ahl", label: "AHL", name: "American Hockey League", scoresPath: "/ahl-scores", standingsPath: "/ahl-standings", standingsKind: "wlotl", statsPath: "/ahl-stats", teamKind: "ahl", logoUrl: "https://theahl.com/wp-content/uploads/sites/3/2016/05/ahl-logo.png"},
   // Scores are a seeded slate + results overlay and there is no stats feed, so no leader boards; the
   // web's ECHL team pages carry identity + affiliations, schedule and roster, and so do ours.
   { id: "echl", label: "ECHL", name: "ECHL", scoresPath: "/echl-scores", standingsPath: "/echl-standings", standingsKind: "wlotl", statsPath: "", teamKind: "echl" },
-  { id: "ohl", label: "OHL", name: "Ontario Hockey League", scoresPath: "/chl-scores", subCode: "OHL", topCode: "CHL", standingsPath: "/ht-standings/ohl", standingsKind: "wlotl", statsPath: "/ht-stats/ohl", teamKind: "chl" },
-  { id: "whl", label: "WHL", name: "Western Hockey League", scoresPath: "/chl-scores", subCode: "WHL", topCode: "CHL", standingsPath: "/ht-standings/whl", standingsKind: "wlotl", statsPath: "/ht-stats/whl", teamKind: "chl" },
-  { id: "qmjhl", label: "QMJHL", name: "Quebec Maritimes Junior Hockey League", scoresPath: "/chl-scores", subCode: "QMJHL", topCode: "CHL", standingsPath: "/ht-standings/qmjhl", standingsKind: "wlotl", statsPath: "/ht-stats/qmjhl", teamKind: "chl" },
-  { id: "ushl", label: "USHL", name: "United States Hockey League", scoresPath: "/ushl-scores", standingsPath: "/ht-standings/ushl", standingsKind: "wlotl", statsPath: "/ht-stats/ushl", teamKind: "ushl" },
-  { id: "ncaa", label: "NCAA", name: "NCAA Division I", scoresPath: "/ncaa-scores", standingsPath: "/ncaa-standings", standingsKind: "ncaa", statsPath: "/ncaa-stats", teamKind: "ncaa", hasConferences: true },
+  { id: "ohl", label: "OHL", name: "Ontario Hockey League", scoresPath: "/chl-scores", subCode: "OHL", topCode: "CHL", standingsPath: "/ht-standings/ohl", standingsKind: "wlotl", statsPath: "/ht-stats/ohl", teamKind: "chl", logoUrl: "https://cdn.ontariohockeyleague.com/uploads/ohl/2015/12/01164141/OHLGeneric.jpg"},
+  { id: "whl", label: "WHL", name: "Western Hockey League", scoresPath: "/chl-scores", subCode: "WHL", topCode: "CHL", standingsPath: "/ht-standings/whl", standingsKind: "wlotl", statsPath: "/ht-stats/whl", teamKind: "chl", logoUrl: "https://upload.wikimedia.org/wikipedia/en/thumb/a/af/Western_Hockey_League.svg/120px-Western_Hockey_League.svg.png"},
+  { id: "qmjhl", label: "QMJHL", name: "Quebec Maritimes Junior Hockey League", scoresPath: "/chl-scores", subCode: "QMJHL", topCode: "CHL", standingsPath: "/ht-standings/qmjhl", standingsKind: "wlotl", statsPath: "/ht-stats/qmjhl", teamKind: "chl", logoUrl: "/qmjhl-logo.png"},
+  { id: "ushl", label: "USHL", name: "United States Hockey League", scoresPath: "/ushl-scores", standingsPath: "/ht-standings/ushl", standingsKind: "wlotl", statsPath: "/ht-stats/ushl", teamKind: "ushl", logoUrl: "/ushl-logo.png"},
+  { id: "ncaa", label: "NCAA", name: "NCAA Division I", scoresPath: "/ncaa-scores", standingsPath: "/ncaa-standings", standingsKind: "ncaa", statsPath: "/ncaa-stats", teamKind: "ncaa", hasConferences: true, logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/NCAA_logo.svg/120px-NCAA_logo.svg.png"},
   // ── Canadian Junior A ───────────────────────────────────────────────────────
   // Six leagues on the same HockeyTech platform, each with its own standings and stats but sharing
   // the /cjra-scores feed the way OHL/WHL/QMJHL share /chl-scores. Listed west to east, matching

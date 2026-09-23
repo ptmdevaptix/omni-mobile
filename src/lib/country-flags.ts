@@ -71,3 +71,38 @@ export function countryFlag(country?: string | null, birthplace?: string | null)
   }
   return undefined;
 }
+
+
+/**
+ * A country's flag as two or three bands, for a league that has no crest of its own. Ported from the
+ * web's league-country: a two-colour flag reads A-B-A so it still fills three bands, a three-colour
+ * one reads A-B-C. Only the colours — the shapes differ and a band is honest about being a hint.
+ */
+const FLAG_COLORS: Record<string, string[]> = {
+  SWE: ['#006AA7', '#FECC02'],
+  FIN: ['#003580', '#FFFFFF'],
+  NOR: ['#BA0C2F', '#FFFFFF', '#00205B'],
+  DNK: ['#C8102E', '#FFFFFF'],
+  ISL: ['#02529C', '#FFFFFF', '#DC1E35'],
+  CZE: ['#11457E', '#FFFFFF', '#D7141A'],
+  SVK: ['#0B4EA2', '#FFFFFF', '#EE1C25'],
+  DEU: ['#000000', '#DD0000', '#FFCE00'],
+  CHE: ['#DA291C', '#FFFFFF'],
+  AUT: ['#ED2939', '#FFFFFF'],
+  RUS: ['#0039A6', '#FFFFFF', '#D52B1E'],
+  LVA: ['#9E3039', '#FFFFFF'],
+  POL: ['#DC143C', '#FFFFFF'],
+  HUN: ['#CE2939', '#FFFFFF', '#477050'],
+  FRA: ['#0055A4', '#FFFFFF', '#EF4135'],
+  GBR: ['#012169', '#FFFFFF', '#C8102E'],
+  ITA: ['#008C45', '#FFFFFF', '#CD212A'],
+  SVN: ['#005DA4', '#FFFFFF', '#ED1C24'],
+  BLR: ['#C8313E', '#FFFFFF', '#4AA657'],
+  UKR: ['#0057B7', '#FFD700'],
+};
+
+export function flagBadgeColors(code?: string | null): [string, string, string] | undefined {
+  const c = FLAG_COLORS[(code ?? '').toUpperCase()];
+  if (!c || c.length < 2) return undefined;
+  return [c[0], c[1], c[2] ?? c[0]];
+}
