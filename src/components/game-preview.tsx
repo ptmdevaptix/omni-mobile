@@ -1,12 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { TeamLogo } from '@/components/team-logo';
-import type { GDTeam } from '@/lib/game-detail-types';
+import { gameTeamPageIds } from '@/lib/follows';
+import type { GameDetail, GDTeam } from '@/lib/game-detail-types';
 import {
   fetchGamePreview, previewSupported, seriesSummary,
   type LeaderSet, type PreviewTeamStats, type SeriesGame,
 } from '@/lib/game-preview';
+import { fetchTeamSchedule } from '@/lib/team';
 import type { ScheduleGame } from '@/lib/team-types';
 import { useTheme } from '@/lib/theme';
 
@@ -20,7 +22,7 @@ import { useTheme } from '@/lib/theme';
  * Silent when the league's feed cannot answer (the route 400s on an unsupported prefix) and when the
  * answer comes back empty, which is the normal case on the first day of a season.
  */
-export function GamePreview({ gameId, away, home }: { gameId: string; away: GDTeam; home: GDTeam }) {
+export function GamePreview({ g, gameId, away, home }: { g: GameDetail; gameId: string; away: GDTeam; home: GDTeam }) {
   const t = useTheme();
   const supported = previewSupported(gameId);
   const q = useQuery({
@@ -30,13 +32,32 @@ export function GamePreview({ gameId, away, home }: { gameId: string; away: GDTe
     staleTime: 5 * 60_000,
   });
   const d = q.data;
-  if (!supported || !d || d.error) return null;
 
-  const series = d.seasonSeries ?? [];
+  // Recent form for the leagues the preview route does not answer for — the European three, the
+  // ECHL, whatever is added next. A club's own schedule already carries its results, so the strip
+  // reads them from there rather than being a thing only some leagues get.
+  const needsForm = !supported || !(d?.awayLast5?.length || d?.homeLast5?.length);
+  const ids = [gameTeamPageIds(g, 'away')[0], gameTeamPageIds(g, 'home')[0]];
+  const schedules = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ['team-schedule', id],
+      queryFn: () => fetchTeamSchedule(id!),
+      enabled: needsForm && !!id,
+      staleTime: 30 * 60_000,
+    })),
+  });
+  const fromSchedule = (i: number): ScheduleGame[] =>
+    (schedules[i]?.data ?? []).filter((x) => x.state === 'FINAL' && x.result).slice(-STRIP);
+
+  const awayForm = needsForm ? fromSchedule(0) : d?.awayLast5 ?? [];
+  const homeForm = needsForm ? fromSchedule(1) : d?.homeLast5 ?? [];
+  const hasForm = !!(awayForm.length || homeForm.length);
+
+  const series = d?.seasonSeries ?? [];
   const summary = seriesSummary(series, away.abbr, home.abbr);
-  const hasLeaders = !!(d.awayLeaders?.points?.[0] || d.homeLeaders?.points?.[0]);
-  const hasStats = (d.awayStats?.gp ?? 0) > 0 || (d.homeStats?.gp ?? 0) > 0;
-  const hasForm = !!(d.awayLast5?.length || d.homeLast5?.length);
+  const hasLeaders = !!(d?.awayLeaders?.points?.[0] || d?.homeLeaders?.points?.[0]);
+  const hasStats = (d?.awayStats?.gp ?? 0) > 0 || (d?.homeStats?.gp ?? 0) > 0;
+  if (d?.error && !hasForm) return null;
   if (!series.length && !hasLeaders && !hasStats && !hasForm) return null;
 
   return (
@@ -50,8 +71,8 @@ export function GamePreview({ gameId, away, home }: { gameId: string; away: GDTe
 
       {hasForm ? (
         <Card title="LAST 5">
-          <Form abbr={away.abbr} games={d.awayLast5 ?? []} />
-          <Form abbr={home.abbr} games={d.homeLast5 ?? []} />
+          <Form abbr={away.abbr} games={awayForm} />
+          <Form abbr={home.abbr} games={homeForm} />
         </Card>
       ) : null}
 
@@ -62,8 +83,8 @@ export function GamePreview({ gameId, away, home }: { gameId: string; away: GDTe
             <CompareRow
               key={key}
               label={label}
-              away={leaderText(d.awayLeaders, key)}
-              home={leaderText(d.homeLeaders, key)}
+              away={leaderText(d?.awayLeaders, key)}
+              home={leaderText(d?.homeLeaders, key)}
             />
           ))}
         </Card>
@@ -72,7 +93,7 @@ export function GamePreview({ gameId, away, home }: { gameId: string; away: GDTe
       {hasStats ? (
         <Card title="TEAM STATS">
           <Heads away={away} home={home} />
-          {statRows(d.awayStats, d.homeStats).map((r) => (
+          {statRows(d!.awayStats, d!.homeStats).map((r) => (
             <CompareRow key={r.label} label={r.label} away={r.away} home={r.home} awayBetter={r.awayBetter} homeBetter={r.homeBetter} />
           ))}
         </Card>

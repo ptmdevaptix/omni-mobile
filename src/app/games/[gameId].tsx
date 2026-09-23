@@ -73,7 +73,7 @@ export default function GameScreen() {
           {g.status === 'UPCOMING' ? (
             <>
               {g.preview || g.previewTitle || g.previewSummary ? <Upcoming g={g} /> : null}
-              <GamePreview gameId={gameId} away={g.awayTeam} home={g.homeTeam} />
+              <GamePreview g={g} gameId={gameId} away={g.awayTeam} home={g.homeTeam} />
               {/* Pregame NHL scratches arrive before the box score does — on their own until then. */}
               {!hasBox && g.scratches && (g.scratches.away.length || g.scratches.home.length) ? <ScratchesCard g={g} followed={followed} /> : null}
               {/* The rosters stand in for a lineup only while there is no written preview and no box
