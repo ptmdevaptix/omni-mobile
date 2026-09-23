@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canSlide, ContractTimeline, contractPlayedOut, contractTimeline, nhlGamesForSlide } from '@/components/contract-timeline';
 import { StateView } from '@/components/state-view';
@@ -11,25 +13,30 @@ import { TeamLogo } from '@/components/team-logo';
 import { countryFlag, leagueCountry } from '@/lib/country-flags';
 import { useFavorites } from '@/lib/favorites';
 import { canonicalPlayerKey, fetchPlayer, seasonLabel } from '@/lib/player';
+import { fetchTeamLookup } from '@/lib/team';
 import type { PlayerContract, PlayerDetail, PlayerDraft, PlayerSeasonStatRow, PlayerStatLine } from '@/lib/player-types';
 import { useTheme } from '@/lib/theme';
 
 export default function PlayerScreen() {
   const t = useTheme();
   const { playerId } = useLocalSearchParams<{ playerId: string }>();
+  const insets = useSafeAreaInsets();
   const q = useQuery({ queryKey: ['player', playerId], queryFn: () => fetchPlayer(playerId) });
   const p = q.data;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <Stack.Screen options={{ title: p?.fullName || 'Player' }} />
+      {/* The same header the team page wears: transparent and untitled, so his club's colour reaches
+          the top of the screen and his name sits in the band rather than above it. */}
+      <Stack.Screen options={{ title: '', headerTransparent: true, headerShadowVisible: false }} />
       {q.isLoading ? (
         <StateView kind="loading" />
       ) : q.isError || !p || p.error || !p.fullName ? (
         <StateView kind="empty" title="Player unavailable" message="This player’s page couldn’t be loaded." />
       ) : (
+        <>
+        <Hero p={p} insetTop={insets.top} />
         <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 28, gap: 12 }}>
-          <Hero p={p} />
           {/* Named by the season it actually holds. "Current Season" over a line from 2023-24 —
               which is what a player who left the NHL still has — claimed it was this year's. */}
           {p.currentSeason ? (
@@ -42,12 +49,17 @@ export default function PlayerScreen() {
               with no totals. The NHL path sends no primaryLeague, and there `league` is right. */}
           <CareerSection rows={p.seasonTotals ?? []} goalie={p.isGoalie} primaryLeague={p.primaryLeague ?? (p.league ?? '').toUpperCase()} totals={p.careerTotals} />
         </ScrollView>
+        </>
       )}
     </View>
   );
 }
 
-function Hero({ p }: { p: PlayerDetail }) {
+/** The iOS navigation bar's own height, and the clearance its round buttons need on either side. */
+const NAV_ROW = 44;
+const SIDE_CLEAR = 62;
+
+function Hero({ p, insetTop }: { p: PlayerDetail; insetTop: number }) {
   const t = useTheme();
   const { loaded, isFavoritePlayer, togglePlayer, renamePlayer } = useFavorites();
   // One key per player, whichever route opened the page (see canonicalPlayerKey). A star placed
@@ -59,6 +71,15 @@ function Hero({ p }: { p: PlayerDetail }) {
   }, [loaded, legacy, key, isFavoritePlayer, renamePlayer]);
   const on = isFavoritePlayer(key) || (!!legacy && isFavoritePlayer(legacy));
   const teamId = p.teamHref?.startsWith('/teams/') ? p.teamHref.slice('/teams/'.length) : undefined;
+  // His club's colour, from the registry — the same source the team page wears. A player between
+  // clubs, or one at a club we carry no colour for, simply gets no wash.
+  const lookup = useQuery({
+    queryKey: ['team-lookup', teamId],
+    queryFn: () => fetchTeamLookup(teamId!),
+    enabled: !!teamId,
+    staleTime: 60 * 60_000,
+  });
+  const primary = lookup.data?.colors?.primary;
   // A club we carry no crest for — nearly always European — wears its country's flag instead of an
   // empty box. The league is the one thing we do know about it, and a league sits in a country.
   const clubFlag = !p.teamLogo ? countryFlag(leagueCountry(p.teamLeague)) : undefined;
@@ -69,10 +90,25 @@ function Hero({ p }: { p: PlayerDetail }) {
    */
   const inactive = p.isActive === false && !p.teamName && p.clubCurrent !== true;
   return (
-    <View style={styles.hero}>
+    <View style={[styles.heroWrap, { paddingTop: insetTop, borderBottomColor: t.border }]}>
+      {primary ? (
+        <LinearGradient
+          colors={[`${primary}${t.mode === 'dark' ? '59' : '2E'}`, 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      ) : null}
+      {/* His name takes the navigation band, centred clear of the back button. */}
+      <View style={styles.identity}>
+        <Text style={{ color: t.text, fontSize: 19, fontWeight: '800' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.88}>
+          {p.fullName}
+        </Text>
+      </View>
+      <View style={styles.hero}>
       {p.headshot ? <Image source={{ uri: p.headshot }} style={styles.headshot} contentFit="cover" /> : <View style={[styles.headshot, { backgroundColor: t.card }]} />}
       <View style={{ flex: 1 }}>
-        <Text style={{ color: t.text, fontSize: 22, fontWeight: '800' }} numberOfLines={1}>{p.fullName}</Text>
         {/* Number, position and the physicals as ONE line.
             Height, weight and handedness are two or three characters each; as three labelled rows in
             the card below they spent a full width apiece saying very little — "R" on its own beside
@@ -122,6 +158,7 @@ function Hero({ p }: { p: PlayerDetail }) {
       <Pressable onPress={() => togglePlayer(key)} hitSlop={10} accessibilityLabel={on ? 'Remove favorite' : 'Add favorite'}>
         <SymbolView name={on ? 'star.fill' : 'star'} tintColor={on ? '#f5a623' : t.subtle} size={26} />
       </Pressable>
+      </View>
     </View>
   );
 }
@@ -487,7 +524,10 @@ function StatCells({ line, goalie, bold }: { line: PlayerStatLine; goalie: boole
 }
 
 const styles = StyleSheet.create({
-  hero: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  // The block runs to the top of the screen and carries the wash, so it clips it at its own edge.
+  heroWrap: { borderBottomWidth: StyleSheet.hairlineWidth, overflow: 'hidden', paddingBottom: 12 },
+  identity: { height: NAV_ROW, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SIDE_CLEAR },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 12 },
   clubRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   pill: { alignSelf: 'flex-start', borderWidth: StyleSheet.hairlineWidth, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginTop: 5 },
   bioValue: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
