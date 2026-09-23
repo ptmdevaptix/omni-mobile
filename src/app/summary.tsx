@@ -96,8 +96,9 @@ function NameCell({ name, club, clubLogo, league, nhlTeam, gameId, dnp }: {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Text style={{ color: dnp ? t.sub : t.text, fontSize: 14, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{name}</Text>
           {/* The club that holds his rights, which for a prospect is not the club he plays for —
-              the same crest the prospects page puts beside him. */}
-          {nhlTeam ? <NhlCrest abbr={nhlTeam} size={14} /> : null}
+              the same crest the prospects page puts beside him. Not for a player already IN the
+              NHL: his rights and his club are the same crest, and showing it twice says nothing. */}
+          {nhlTeam && league?.toUpperCase() !== 'NHL' ? <NhlCrest abbr={nhlTeam} size={14} /> : null}
         </View>
         <Text style={{ color: t.subtle, fontSize: 10.5 }} numberOfLines={1}>
           {[league, club].filter(Boolean).join(' · ')}
