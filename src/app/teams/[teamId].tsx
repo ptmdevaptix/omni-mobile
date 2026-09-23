@@ -19,13 +19,17 @@ import { TeamLogo } from '@/components/team-logo';
 import { api, displayLeagueOf, leagueOf, teamHeaderPath } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
 import { fetchTeamLookup, teamTabs, type AffiliateRef, type TeamTab } from '@/lib/team';
-import { composeTeamName } from '@/lib/team-name';
+import { composeTeamName, shortTeamName } from '@/lib/team-name';
 import { teamLinkLabel, useTeamLinks } from '@/lib/team-links';
 import { useTheme } from '@/lib/theme';
 import type { TeamHeader } from '@/lib/types';
 
 /** The iOS navigation bar's own height, under the status bar. Fixed on a phone. */
 const NAV_ROW = 44;
+/** Clearance for the round grounds iOS draws the back button and the star on. */
+const SIDE_CLEAR = 62;
+const CREST = 30;
+const CREST_GAP = 10;
 
 export default function TeamScreen() {
   const t = useTheme();
@@ -35,6 +39,9 @@ export default function TeamScreen() {
 
   const tabs = teamTabs(teamId);
   const [tab, setTab] = useState<TeamTab>(tabs[0]);
+  // How wide the band is, and whether the club's full name fits across it.
+  const [bandWidth, setBandWidth] = useState(0);
+  const [nameFits, setNameFits] = useState(true);
 
   const q = useQuery({ queryKey: ['team-header', teamId], queryFn: () => api<TeamHeader>(teamHeaderPath(teamId)) });
   const team = q.data;
@@ -90,12 +97,39 @@ export default function TeamScreen() {
             ) : null}
             {/* Crest and name ride in the navigation band itself, inset past the back chevron on one
                 side and the star on the other. That is the row the page used to spend on "NYI". */}
-            <View style={styles.identity}>
-              {team.logo ? <TeamLogo uri={team.logo} size={30} /> : null}
-              {/* A club whose nickname IS its place — HV71, Färjestad BK — is named once. */}
-              <Text style={{ color: t.text, fontSize: 19, fontWeight: '800', flexShrink: 1 }} numberOfLines={1}>
-                {composeTeamName(team.name, team.nickname)}
+            <View style={styles.identity} onLayout={(e) => setBandWidth(e.nativeEvent.layout.width)}>
+              {team.logo ? <TeamLogo uri={team.logo} size={CREST} /> : null}
+              {/* A club whose nickname IS its place — HV71, Färjestad BK — is named once. Where the
+                  full name is too long for the band — "Notre Dame Fighting Irish" — it falls back to
+                  the app's short name for a club: the nickname in the NHL, the place everywhere
+                  else, and the single name it has when place and nickname are the same or one of
+                  them is missing. Truncating to "Notre Dame Fighting Ir…" would say less in the same
+                  room. */}
+              {/* Shortening comes first and happens at full size — a name shrunk to fit reads as a
+                  mistake long before it becomes unreadable. The small scale below is only a guard for
+                  a club whose SHORT name is also too wide; the real fix for one of those is an entry
+                  in SHORT_NAME_OVERRIDES, which is how Wilkes-Barre/Scranton is handled. */}
+              <Text style={[nameStyle, { color: t.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.88}>
+                {nameFits
+                  ? composeTeamName(team.name, team.nickname)
+                  : shortTeamName(
+                      teamId,
+                      { location: team.name, nickname: team.nickname, name: composeTeamName(team.name, team.nickname), abbr: team.abbr },
+                      leagueOf(teamId) === 'NHL',
+                    )}
               </Text>
+              {/* Measured rather than guessed from a character count: names are not equally wide, and
+                  the band is a different size on every phone. Invisible, and laid out at exactly the
+                  width the visible name has, so two lines means the one line would have been cut. */}
+              {bandWidth > 0 ? (
+                <Text
+                  style={[nameStyle, styles.measure, { width: bandWidth - SIDE_CLEAR * 2 - (team.logo ? CREST + CREST_GAP : 0) }]}
+                  numberOfLines={2}
+                  pointerEvents="none"
+                  onTextLayout={(e) => setNameFits(e.nativeEvent.lines.length <= 1)}>
+                  {composeTeamName(team.name, team.nickname)}
+                </Text>
+              ) : null}
             </View>
 
             <View style={{ paddingHorizontal: 16, alignItems: 'center' }}>
@@ -165,6 +199,8 @@ export default function TeamScreen() {
   );
 }
 
+const nameStyle = { fontSize: 19, fontWeight: '800' as const, flexShrink: 1 };
+
 const styles = StyleSheet.create({
   affRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6 },
   affChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -175,5 +211,6 @@ const styles = StyleSheet.create({
   // Centred, with equal clearance for the two controls already in that band: iOS draws each of them
   // on a round ground about 40pt across, not as a bare glyph, so the clearance is the circle's.
   // Centring is also what keeps the name off them — it grows from the middle outwards, not into one.
-  identity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: NAV_ROW, paddingHorizontal: 62 },
+  identity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: CREST_GAP, height: NAV_ROW, paddingHorizontal: SIDE_CLEAR },
+  measure: { position: 'absolute', opacity: 0, left: 0, top: 0 },
 });

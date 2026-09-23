@@ -44,3 +44,21 @@ export function teamDisplayName(team: NamedTeam, nhl: boolean): string {
   const first = nhl ? nick || place : place || nick;
   return first || (team.name ?? '').trim() || (team.abbr ?? '').trim();
 }
+
+
+/**
+ * What to call a club when the full name will not fit and the rule above cannot help.
+ *
+ * Keyed by the team's page id. These are editorial, not data: Wilkes-Barre/Scranton's place IS the
+ * pair of cities in every feed and in our own registry, so there is nothing to derive a shorter one
+ * from, and splitting a joined name is forbidden for good reason elsewhere. The full name is
+ * untouched — this only decides what a narrow space falls back to.
+ */
+const SHORT_NAME_OVERRIDES: Record<string, string> = {
+  'ahl-316': 'Wilkes-Barre',   // Wilkes-Barre/Scranton Penguins
+};
+
+/** The short name for a club: the override if it has one, else the rule. */
+export function shortTeamName(teamId: string, team: NamedTeam, nhl: boolean): string {
+  return SHORT_NAME_OVERRIDES[(teamId ?? '').toLowerCase()] ?? teamDisplayName(team, nhl);
+}
