@@ -145,7 +145,7 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
     const mine = !!followed(r);
     return (
     <View style={[styles.cell, styles.nameCell, { width: W.name }, mine && { backgroundColor: `${t.accent}0d` }]}>
-      <Text style={[styles.num, { color: t.subtle, width: W.rank, textAlign: 'right' }]}>{i + 1}</Text>
+      <Text style={[styles.num, { color: t.subtle, width: W.rank, textAlign: 'left' }]}>{i + 1}</Text>
       <TeamLogo uri={r.teamLogo} darkUri={r.teamDarkLogo} size={18} />
       <View style={{ flexShrink: 1 }}>
         <Text style={{ color: mine ? t.accent : t.text, fontSize: 13, fontWeight: mine ? '800' : '600' }} numberOfLines={1}>
@@ -167,8 +167,10 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
         <View style={[styles.frozen, { borderRightColor: t.border }]}>
           <View style={[styles.row, styles.headRow, { borderBottomColor: t.border }]}>
             <View style={[styles.cell, styles.nameCell, { width: W.name }]}>
-              <Text style={[styles.head, { color: t.sub, width: W.rank, textAlign: 'right' }]}>RK</Text>
-              <Text style={[styles.head, { color: t.sub }]}>Player</Text>
+              <Text style={[styles.head, { color: t.sub, width: W.rank, textAlign: 'left' }]}>RK</Text>
+              {/* Stands in for the crest, so Player sits over the names and not over the crests. */}
+              <View style={{ width: 18 }} />
+              <Text style={[styles.head, { color: t.sub, textAlign: 'left' }]}>Player</Text>
             </View>
           </View>
           {visible.map((r, i) => {
@@ -231,9 +233,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, height: 42 },
   headRow: { height: 30 },
   cell: { paddingHorizontal: 3, justifyContent: 'center' },
-  // No left padding: the rank column is the card's own edge, so the numbers and the crests below
-  // them line up with the header rather than floating in a margin.
-  nameCell: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 0 },
+  // justifyContent must be flex-start, overriding the `center` the stat cells want: this cell is a
+  // ROW, so centring it centred rank + crest + name inside 150pt as a block. Every row's block was a
+  // different width, so every row's left edge landed somewhere else and the rank column waved about.
+  nameCell: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 6, paddingLeft: 2, paddingRight: 0 },
   head: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', textAlign: 'right' },
   num: { fontSize: 13, textAlign: 'right', fontVariant: ['tabular-nums'] },
   foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
