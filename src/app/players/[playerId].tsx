@@ -55,6 +55,12 @@ export default function PlayerScreen() {
   );
 }
 
+/** First and last initial, for a player with neither a portrait nor a club crest to stand in. */
+function initialsOf(name: string): string {
+  const w = name.trim().split(/\s+/).filter(Boolean);
+  return ((w[0]?.[0] ?? '') + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase() || '?';
+}
+
 /** The iOS navigation bar's own height, and the clearance its round buttons need on either side. */
 const NAV_ROW = 44;
 const SIDE_CLEAR = 62;
@@ -107,7 +113,20 @@ function Hero({ p, insetTop }: { p: PlayerDetail; insetTop: number }) {
         </Text>
       </View>
       <View style={styles.hero}>
-      {p.headshot ? <Image source={{ uri: p.headshot }} style={styles.headshot} contentFit="cover" /> : <View style={[styles.headshot, { backgroundColor: t.card }]} />}
+      {/* Most leagues outside the NHL publish no headshots, and an empty disc said nothing about
+          whose page this is. His club's crest does, at the size the portrait would have been; a club
+          we cannot draw, or no club at all, leaves his initials. */}
+      {p.headshot ? (
+        <Image source={{ uri: p.headshot }} style={styles.headshot} contentFit="cover" />
+      ) : p.teamLogo ? (
+        <View style={[styles.headshot, styles.avatar, { backgroundColor: t.card }]}>
+          <TeamLogo uri={p.teamLogo} size={54} />
+        </View>
+      ) : (
+        <View style={[styles.headshot, styles.avatar, { backgroundColor: t.card }]}>
+          <Text style={{ color: t.sub, fontSize: 26, fontWeight: '800' }}>{initialsOf(p.fullName)}</Text>
+        </View>
+      )}
       <View style={{ flex: 1 }}>
         {/* Number, position and the physicals as ONE line.
             Height, weight and handedness are two or three characters each; as three labelled rows in
@@ -532,6 +551,7 @@ const styles = StyleSheet.create({
   pill: { alignSelf: 'flex-start', borderWidth: StyleSheet.hairlineWidth, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginTop: 5 },
   bioValue: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   headshot: { width: 76, height: 76, borderRadius: 38 },
+  avatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 2 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 8 },
   statRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 2 },
