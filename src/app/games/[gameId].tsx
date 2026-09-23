@@ -10,6 +10,8 @@ import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { shortDate, timeOfDay } from '@/lib/format';
 import { followedLabel, followedOnGame, type FollowedOnGame } from '@/lib/follows';
+import { GamePreview } from '@/components/game-preview';
+import { GameRosters } from '@/components/game-rosters';
 import { useFollowedMatcher } from '@/lib/use-follows';
 import { fetchGameDetail } from '@/lib/game';
 import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo } from '@/lib/game-detail-types';
@@ -49,8 +51,12 @@ export default function GameScreen() {
           {g.status === 'UPCOMING' ? (
             <>
               <Upcoming g={g} />
+              <GamePreview gameId={gameId} away={g.awayTeam} home={g.homeTeam} />
               {/* Pregame NHL scratches arrive before the box score does — on their own until then. */}
               {!hasBox && g.scratches && (g.scratches.away.length || g.scratches.home.length) ? <ScratchesCard g={g} followed={followed} /> : null}
+              {/* The rosters stand in for a lineup only while there is no written preview and no box
+                  score — once either exists there is something better to read. */}
+              {!hasBox && !g.preview ? <GameRosters g={g} /> : null}
             </>
           ) : hasBox ? (
             <>
@@ -165,10 +171,21 @@ function Upcoming({ g }: { g: GameDetail }) {
   return (
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
       <Text style={[styles.section, { color: t.sub }]}>PREVIEW</Text>
-      {g.startTimeUTC ? <Text style={{ color: t.text, fontSize: 14, marginBottom: g.preview ? 8 : 0 }}>{shortDate(g.startTimeUTC)} · {timeOfDay(g.startTimeUTC)}</Text> : null}
-      <Text style={{ color: g.preview ? t.text : t.subtle, fontSize: 14, lineHeight: 21 }}>
-        {g.preview || 'A preview for this game isn’t available yet.'}
-      </Text>
+      {g.startTimeUTC ? <Text style={{ color: t.text, fontSize: 14, marginBottom: 8 }}>{shortDate(g.startTimeUTC)} · {timeOfDay(g.startTimeUTC)}</Text> : null}
+      {g.previewTitle ? (
+        <Text style={{ color: t.text, fontSize: 17, fontWeight: '800', lineHeight: 22, marginBottom: 4 }}>{g.previewTitle}</Text>
+      ) : null}
+      {g.previewSummary ? (
+        <Text style={{ color: t.sub, fontSize: 14, lineHeight: 20, marginBottom: 8 }}>{g.previewSummary}</Text>
+      ) : null}
+      {/* The body arrives as blank-line-separated paragraphs; running them together loses the shape. */}
+      {g.preview ? (
+        g.preview.split(/\n\s*\n/).filter(Boolean).map((para, i) => (
+          <Text key={i} style={{ color: t.text, fontSize: 14, lineHeight: 21, marginTop: i ? 10 : 0 }}>{para.trim()}</Text>
+        ))
+      ) : g.previewTitle || g.previewSummary ? null : (
+        <Text style={{ color: t.subtle, fontSize: 14, lineHeight: 21 }}>A preview for this game isn’t available yet.</Text>
+      )}
     </View>
   );
 }

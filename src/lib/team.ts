@@ -1,4 +1,5 @@
 import { api, leagueOf, teamHeaderPath } from './api';
+import type { RosterMovesResponse } from '@/lib/ncaa-moves-types';
 import type { RosterResponse, ScheduleGame, TeamHomeData, TeamOrganization, TeamStatsResponse } from './team-types';
 
 export type TeamTab = 'home' | 'schedule' | 'roster' | 'stats' | 'prospects' | 'news';
@@ -51,7 +52,14 @@ export const fetchTeamLookup = (id: string) =>
   api<{ teams?: Record<string, TeamLookup> }>(`/teams/lookup?ids=${encodeURIComponent(id)}`).then((r) => r.teams?.[id]);
 
 export const fetchTeamHome = (id: string) => api<TeamHomeData>(subPath(id, 'home'));
-export const fetchTeamRoster = (id: string) => api<RosterResponse>(subPath(id, 'roster'));
+// A season is sent only when the reader picked one; without it the route serves its own default,
+// which is the current season for every league.
+export const fetchTeamRoster = (id: string, season?: string | null) =>
+  api<RosterResponse>(subPath(id, 'roster') + (season ? `?season=${encodeURIComponent(season)}` : ''));
+
+/** NCAA roster changes — who arrived, who left. Fetched only when the reader opens the view. */
+export const fetchNcaaMoves = (id: string, season?: string | null) =>
+  api<RosterMovesResponse>(subPath(id, 'moves') + (season ? `?season=${encodeURIComponent(season)}` : ''));
 export const fetchTeamStats = (id: string) => api<TeamStatsResponse>(subPath(id, 'stats'));
 export const fetchTeamOrg = (id: string) => api<TeamOrganization>(subPath(id, 'organization'));
 export const fetchTeamSchedule = (id: string) =>

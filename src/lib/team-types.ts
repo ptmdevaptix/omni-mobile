@@ -28,6 +28,8 @@ export type RosterResponse = {
   estimated?: boolean;
   incomingOnly?: boolean;
   season?: string;
+  /** Which seasons this club actually has a roster for — the selector offers no dead season. */
+  availableSeasons?: string[];
   error?: string;
 };
 
