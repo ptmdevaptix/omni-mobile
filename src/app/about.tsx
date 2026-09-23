@@ -31,7 +31,10 @@ export default function AboutScreen() {
       <View style={styles.headerBlock}>
         <Image source={t.mode === 'dark' ? DARK : LIGHT} style={{ width: 64, height: 64 }} contentFit="contain" />
         <Text style={{ color: t.text, fontSize: 22, fontWeight: '800' }}>Omni Hockey</Text>
-        <Text style={{ color: t.sub, fontSize: 14, textAlign: 'center' }}>Sports intelligence for the NHL, AHL, CHL & NCAA.</Text>
+        {/* No league list here. It named four when the app covered four, and was wrong the moment a
+            fifth arrived; the About page inside lists them and is the one place that has to be kept
+            right. */}
+        <Text style={{ color: t.sub, fontSize: 14, textAlign: 'center' }}>Scores, standings and stats from across the hockey world.</Text>
         <Text style={{ color: t.subtle, fontSize: 12 }}>Version {version}</Text>
       </View>
 

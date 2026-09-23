@@ -2,7 +2,7 @@
   "expo": {
     "name": "Omni Hockey",
     "slug": "omni-hockey",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "updates": {
       "url": "https://u.expo.dev/9d880ab1-8a1e-4a83-a5d6-64e7c10749bb"
