@@ -28,10 +28,11 @@ export function GameBoxScore({ g, followed = [] }: { g: GameDetail; followed?: F
   const [side, setSide] = useState<'away' | 'home'>('away');
   const rosters = g.rosters;
   if (!rosters) return null;
-  // A followed player's row is starred: joined by the feed's id where we hold it, else by name.
+  // A followed player's row is marked in the accent colour and faintly tinted — not with a star,
+  // which shifted the name in a cell that has no room to give. Joined by the feed's id where we hold
+  // it, else by name.
   const mine = followed.filter((p) => p.side === side);
   const isMine = (p: { name: string; playerId?: number | string }) => mine.some((f) => rowIsPlayer(p, f));
-  const star = <Text style={{ color: t.accent, fontSize: 11 }} accessibilityLabel="Followed player">★ </Text>;
   // The API links each row by its stored slug for every league it has seeded; the NHL id is the
   // fallback for a player the nightly refresh has not minted yet.
   const nhl = (g.league || '').toUpperCase() === 'NHL';
@@ -76,9 +77,9 @@ export function GameBoxScore({ g, followed = [] }: { g: GameDetail; followed?: F
           <View key={gr.label}>
             <Text style={[styles.group, { color: t.subtle }]}>{gr.label.toUpperCase()}</Text>
             {gr.players.map((p) => (
-              <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)}>
+              <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)} mine={isMine(p)}>
                 <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
-                <Text style={[styles.name, { color: t.text, fontWeight: isMine(p) ? '800' : '600' }]} numberOfLines={1}>{isMine(p) ? star : null}{fitName(p.name)}</Text>
+                <Text style={[styles.name, { color: isMine(p) ? t.accent : t.text, fontWeight: isMine(p) ? '800' : '600' }]} numberOfLines={1}>{fitName(p.name)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.goals)}</Text>
                 <Text style={[styles.c, { color: t.text }]}>{fmt(p.assists)}</Text>
                 {hasSog ? <Text style={[styles.c, { color: t.text }]}>{fmt(p.sog)}</Text> : null}
@@ -104,9 +105,9 @@ export function GameBoxScore({ g, followed = [] }: { g: GameDetail; followed?: F
             <Text style={[styles.toi, { color: t.sub }]}>TOI</Text>
           </View>
           {goalies.map((p: BoxGoalie) => (
-            <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)}>
+            <BoxRow key={p.playerId} routeId={p.playerSlug ?? (nhl ? playerRouteId(p.playerId) : null)} mine={isMine(p)}>
               <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
-              <Text style={[styles.name, { color: t.text, fontWeight: isMine(p) ? '800' : '600' }]} numberOfLines={1}>{isMine(p) ? star : null}{fitName(p.name)}</Text>
+              <Text style={[styles.name, { color: isMine(p) ? t.accent : t.text, fontWeight: isMine(p) ? '800' : '600' }]} numberOfLines={1}>{fitName(p.name)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.shotsAgainst)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.saves)}</Text>
               <Text style={[styles.c, { color: t.text }]}>{fmt(p.goalsAgainst)}</Text>
@@ -145,9 +146,9 @@ export function ScratchesCard({ g, followed = [], side }: { g: GameDetail; follo
             {list.length === 0 ? <Text style={{ color: t.subtle, fontSize: 12 }}>None</Text> : list.map((p, i) => {
               const isMine = mine.some((f) => rowIsPlayer(p, f));
               return (
-                <BoxRow key={`${p.playerId ?? i}`} routeId={p.playerSlug ?? null}>
+                <BoxRow key={`${p.playerId ?? i}`} routeId={p.playerSlug ?? null} mine={isMine}>
                   <Text style={[styles.num, { color: t.subtle }]}>{p.number ?? ''}</Text>
-                  <Text style={[styles.name, { color: isMine ? t.accent : t.text, fontWeight: isMine ? '800' : '600' }]} numberOfLines={1}>{isMine ? '★ ' : ''}{p.name}</Text>
+                  <Text style={[styles.name, { color: isMine ? t.accent : t.text, fontWeight: isMine ? '800' : '600' }]} numberOfLines={1}>{p.name}</Text>
                   <Text style={{ color: t.sub, fontSize: 12 }}>{[p.position, p.reason].filter(Boolean).join(' — ')}</Text>
                 </BoxRow>
               );
@@ -159,12 +160,15 @@ export function ScratchesCard({ g, followed = [], side }: { g: GameDetail; follo
   );
 }
 
-function BoxRow({ routeId, children }: { routeId: string | null; children: ReactNode }) {
+function BoxRow({ routeId, children, mine }: { routeId: string | null; children: ReactNode; mine?: boolean }) {
   const t = useTheme();
-  if (!routeId) return <View style={[styles.drow, { borderColor: t.border }]}>{children}</View>;
+  // A followed player's row carries a wash of the accent — enough to find him while scrolling,
+  // faint enough that it does not read as a selection.
+  const row = [styles.drow, { borderColor: t.border }, mine ? { backgroundColor: `${t.accent}14` } : null];
+  if (!routeId) return <View style={row}>{children}</View>;
   return (
     <Link href={{ pathname: '/players/[playerId]', params: { playerId: routeId } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.drow, { borderColor: t.border }])}>{children}</Pressable>
+      <Pressable style={StyleSheet.flatten(row)}>{children}</Pressable>
     </Link>
   );
 }

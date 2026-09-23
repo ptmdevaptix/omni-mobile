@@ -103,7 +103,8 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
 }) {
   const t = useTheme();
   // A leaderboard is a list of strangers with, now and then, one of the reader's own in it. Marked
-  // the same way the box score marks them: a star and the accent colour.
+  // the same way the box score marks them: the accent colour and a faint wash of the row. Not a
+  // star — a glyph ahead of the name shifted it, and the frozen cell has no width to spare.
   const followed = useFollowedMatcher();
   const [sortKey, setSortKey] = useState(defaultSort);
   const [desc, setDesc] = useState(true);
@@ -143,12 +144,12 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
   const nameCell = (r: R, i: number) => {
     const mine = !!followed(r);
     return (
-    <View style={[styles.cell, styles.nameCell, { width: W.name }]}>
+    <View style={[styles.cell, styles.nameCell, { width: W.name }, mine && { backgroundColor: `${t.accent}0d` }]}>
       <Text style={[styles.num, { color: t.subtle, width: W.rank, textAlign: 'right' }]}>{i + 1}</Text>
       <TeamLogo uri={r.teamLogo} darkUri={r.teamDarkLogo} size={18} />
       <View style={{ flexShrink: 1 }}>
         <Text style={{ color: mine ? t.accent : t.text, fontSize: 13, fontWeight: mine ? '800' : '600' }} numberOfLines={1}>
-          {mine ? '★ ' : ''}{fitName(r.name, mine ? 10 : 12)}
+          {fitName(r.name)}
         </Text>
         {/* Position, league and club — a column each on the web, one quiet line here. */}
         <Text style={{ color: t.subtle, fontSize: 10.5 }} numberOfLines={1}>
@@ -186,7 +187,9 @@ function Table<R extends Base>({ rows, cols, defaultSort, showLeague, showPos, f
               {cols.map(statHead)}
             </View>
             {visible.map((r) => (
-              <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
+              // The scrolling half carries the same wash, so a followed player's row reads as one
+              // band across the frozen seam rather than a tinted name beside untinted numbers.
+              <View key={r.key} style={[styles.row, { borderBottomColor: t.border }, followed(r) && { backgroundColor: `${t.accent}0d` }]}>
                 {cols.map((c) => {
                   const on = c.key === col.key;
                   return (

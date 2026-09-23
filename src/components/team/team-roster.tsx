@@ -74,8 +74,9 @@ function posAbbr(p: RosterPlayer): string | null {
 
 function PlayerRow({ p, routeId, flagInName }: { p: RosterPlayer; routeId: string | null; flagInName: boolean }) {
   const t = useTheme();
-  // One of the reader's own, starred the way the box score stars him. Not done on the prospects
-  // tab, where every row would carry the mark and the mark would say nothing.
+  // One of the reader's own, marked the way the box score marks him: the accent colour and a faint
+  // wash, never a star ahead of the name. Not done on the prospects tab, where every row would carry
+  // the mark and the mark would say nothing.
   const followed = useFollowedMatcher();
   const mine = !!followed({ name: p.name, playerId: p.id, playerSlug: p.playerSlug });
   const abbr = posAbbr(p);
@@ -86,17 +87,18 @@ function PlayerRow({ p, routeId, flagInName }: { p: RosterPlayer; routeId: strin
       <Text style={[styles.num, { color: t.subtle }]}>{p.number != null ? p.number : '--'}</Text>
       <View style={{ flex: 1 }}>
         <Text style={{ color: mine ? t.accent : t.text, fontSize: 15, fontWeight: mine ? '800' : '600' }} numberOfLines={1}>
-          {mine ? '★ ' : ''}{p.name}{abbr ? <Text style={{ color: t.sub, fontWeight: '400' }}> ({abbr})</Text> : null}{flag ? <Text accessibilityLabel={p.birthCountry}> {flag}</Text> : null}
+          {p.name}{abbr ? <Text style={{ color: t.sub, fontWeight: '400' }}> ({abbr})</Text> : null}{flag ? <Text accessibilityLabel={p.birthCountry}> {flag}</Text> : null}
         </Text>
         {p.birthplace ? <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>{p.birthplace}</Text> : null}
       </View>
       <Text style={{ color: t.sub, fontSize: 13, fontVariant: ['tabular-nums'] }}>{htwt}</Text>
     </>
   );
-  if (!routeId) return <View style={[styles.row, { borderColor: t.border }]}>{body}</View>;
+  const row = [styles.row, { borderColor: t.border }, mine ? { backgroundColor: `${t.accent}14` } : null];
+  if (!routeId) return <View style={row}>{body}</View>;
   return (
     <Link href={{ pathname: '/players/[playerId]', params: { playerId: routeId } }} asChild>
-      <Pressable style={StyleSheet.flatten([styles.row, { borderColor: t.border }])}>{body}</Pressable>
+      <Pressable style={StyleSheet.flatten(row)}>{body}</Pressable>
     </Link>
   );
 }

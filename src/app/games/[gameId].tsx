@@ -175,8 +175,8 @@ function Upcoming({ g }: { g: GameDetail }) {
 
 function PlayedBody({ g }: { g: GameDetail }) {
   const t = useTheme();
-  // The reader's own players, marked wherever the summary names them — a star and the accent colour,
-  // the same mark the box score uses.
+  // The reader's own players, marked wherever the summary names them — the accent colour, the same
+  // mark the box score uses, and no glyph to push the name along.
   const followed = useFollowedMatcher();
   const hasScoring = g.scoring?.some((p) => p.goals.length);
   const logoFor = (abbr: string) => (abbr === g.awayTeam.abbr ? g.awayTeam.logo : g.homeTeam.logo);
@@ -238,7 +238,7 @@ function GoalRow({ goal, logo, darkLogo }: { goal: GoalInfo; logo?: string; dark
       <TeamLogo uri={logo} darkUri={darkLogo} size={24} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: scorerMine ? t.accent : t.text, fontSize: 14, fontWeight: scorerMine ? '800' : '600' }} numberOfLines={1}>
-          {scorerMine ? '★ ' : ''}{goal.scorer}{goal.goalType ? <Text style={{ color: t.accent }}> {goal.goalType}</Text> : null}
+          {goal.scorer}{goal.goalType ? <Text style={{ color: t.accent }}> {goal.goalType}</Text> : null}
         </Text>
         {assists.length ? (
           <Text style={{ color: t.sub, fontSize: 12 }} numberOfLines={1}>
@@ -246,7 +246,7 @@ function GoalRow({ goal, logo, darkLogo }: { goal: GoalInfo; logo?: string; dark
               const mine = !!followed({ name: a.name });
               return (
                 <Text key={i} style={mine ? { color: t.accent, fontWeight: '700' } : undefined}>
-                  {i ? ', ' : ''}{mine ? '★ ' : ''}{a.name}
+                  {i ? ', ' : ''}{a.name}
                 </Text>
               );
             })}
