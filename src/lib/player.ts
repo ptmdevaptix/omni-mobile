@@ -4,8 +4,15 @@ import type { PlayerDetail, PlayerSearchResult } from './player-types';
 // Player detail — the API accepts "nhl-{id}", a bare id, or a "name-id" slug (it parses the trailing id).
 export const fetchPlayer = (playerId: string) => api<PlayerDetail>(`/player/${playerId}`);
 
-export const searchPlayers = (q: string) =>
-  api<{ players?: PlayerSearchResult[] }>(`/search/players?q=${encodeURIComponent(q)}`).then((r) => r.players ?? []);
+/**
+ * Player search. The route filters to players still playing unless told otherwise, so a reader
+ * looking for Gretzky has to say so — `activeOnly: false` passes that through and also opens the
+ * route's fallback for players our own tables never held.
+ */
+export const searchPlayers = (q: string, activeOnly = true) =>
+  api<{ players?: PlayerSearchResult[] }>(
+    `/search/players?q=${encodeURIComponent(q)}${activeOnly ? '' : '&activeOnly=0'}`,
+  ).then((r) => r.players ?? []);
 
 // 20252026 → "2025-26"
 export function seasonLabel(season?: number): string {

@@ -550,3 +550,23 @@ export async function fetchAllTeams(): Promise<TeamDirectoryEntry[]> {
   const raw = await api<{ teams?: TeamDirectoryEntry[] }>("/all-teams");
   return raw.teams ?? [];
 }
+
+
+/**
+ * The ladder search sorts by: the NHL first, then the leagues that feed it, then Europe, then
+ * anything we do not carry. Ported from the web's player-search-rank so a team list and a player
+ * list come back in the same order.
+ */
+const LEAGUE_TIER: Record<string, number> = {
+  NHL: 0,
+  AHL: 1,
+  ECHL: 2,
+  NCAA: 3,
+  OHL: 4, WHL: 4, QMJHL: 4,
+  USHL: 5,
+  AJHL: 6, BCHL: 6, CCHL: 6, MJHL: 6, OJHL: 6, SJHL: 6,
+  SHL: 7, LIIGA: 7, ELH: 7,
+};
+
+export const leagueRank = (league?: string | null): number =>
+  LEAGUE_TIER[(league ?? '').toUpperCase()] ?? 99;

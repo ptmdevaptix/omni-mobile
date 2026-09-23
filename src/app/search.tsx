@@ -7,8 +7,9 @@ import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { useFavorites } from '@/lib/favorites';
-import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
+import { fetchAllTeams, leagueRank, type TeamDirectoryEntry } from '@/lib/leagues';
 import { searchPlayers } from '@/lib/player';
+import { teamMatches } from '@/lib/team-search-terms';
 import type { PlayerSearchResult } from '@/lib/player-types';
 import { useTheme } from '@/lib/theme';
 
@@ -17,15 +18,28 @@ export default function SearchScreen() {
   const t = useTheme();
   const router = useRouter();
   const [q, setQ] = useState('');
+  // Off by default, as on the web: a search is nearly always for someone playing now, and the
+  // retired names would crowd out the live one.
+  const [activeOnly, setActiveOnly] = useState(true);
   const s = q.trim();
 
   const teamsQ = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
-  const playersQ = useQuery({ queryKey: ['player-search', s.toLowerCase()], queryFn: () => searchPlayers(s), enabled: s.length >= 2 });
+  const playersQ = useQuery({
+    queryKey: ['player-search', s.toLowerCase(), activeOnly],
+    queryFn: () => searchPlayers(s, activeOnly),
+    enabled: s.length >= 2,
+  });
 
+  // A club is found by everything it could reasonably be typed as — its id, its name with the
+  // abbreviations in it spelled out ("penn state", "western michigan"), and a short alias list for
+  // the names that share no text with the stored one ("habs", "connecticut"). A plain substring test
+  // over the displayed name found none of those.
   const teams = useMemo(() => {
     if (!s) return [] as TeamDirectoryEntry[];
-    const l = s.toLowerCase();
-    return (teamsQ.data ?? []).filter((tm) => tm.name.toLowerCase().includes(l) || (tm.abbr ?? '').toLowerCase().includes(l)).slice(0, 40);
+    return (teamsQ.data ?? [])
+      .filter((tm) => teamMatches({ id: tm.id, name: tm.name, abbr: tm.abbr ?? '' }, s))
+      .sort((a, b) => leagueRank(a.league) - leagueRank(b.league) || a.name.localeCompare(b.name))
+      .slice(0, 12);
   }, [s, teamsQ.data]);
 
   // Straight through, in the order the API returned. It ranks by relevance, then league tier, then
@@ -66,10 +80,33 @@ export default function SearchScreen() {
         </View>
       </View>
 
+      {/* The switch belongs beside the results, not in settings: it is a property of this search. */}
+      {s !== '' ? (
+        <Pressable
+          onPress={() => setActiveOnly((v) => !v)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: activeOnly }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingBottom: 8 }}>
+          <View style={{
+            width: 17, height: 17, borderRadius: 4, borderWidth: 1.5,
+            borderColor: activeOnly ? t.accent : t.border,
+            backgroundColor: activeOnly ? t.accent : 'transparent',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            {activeOnly ? <SymbolView name="checkmark" tintColor="#fff" size={11} /> : null}
+          </View>
+          <Text style={{ color: t.sub, fontSize: 13 }}>Active players only</Text>
+        </Pressable>
+      ) : null}
+
       {s === '' ? (
-        <StateView kind="empty" title="Search" message="Find any team, or an NHL player by name." />
+        <StateView kind="empty" title="Search" message="Find any team, or a player by name." />
       ) : noResults ? (
-        <StateView kind="empty" title="No matches" message={`Nothing found for “${s}”.`} />
+        <StateView
+          kind="empty"
+          title="No matches"
+          message={activeOnly ? `Nothing found for “${s}”. Turn off Active players only to include retired ones.` : `Nothing found for “${s}”.`}
+        />
       ) : (
         <SectionList
           sections={sections}
