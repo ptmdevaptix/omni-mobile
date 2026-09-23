@@ -85,8 +85,8 @@ export default function SummaryScreen() {
   );
 }
 
-function NameCell({ name, club, clubLogo, league, nhlTeam, gameId, dnp }: {
-  name: string; club?: string; clubLogo?: string; league?: string; nhlTeam?: string; gameId?: string; dnp?: boolean;
+function NameCell({ name, club, clubLogo, league, nhlTeam, playerSlug, dnp }: {
+  name: string; club?: string; clubLogo?: string; league?: string; nhlTeam?: string; playerSlug?: string; dnp?: boolean;
 }) {
   const t = useTheme();
   const body = (
@@ -106,9 +106,11 @@ function NameCell({ name, club, clubLogo, league, nhlTeam, gameId, dnp }: {
       </View>
     </View>
   );
-  if (!gameId) return body;
+  // His page, not his game. This is a list of people, and the row is the person — the game is one
+  // night of his and reachable from the page anyway.
+  if (!playerSlug) return body;
   return (
-    <Link href={{ pathname: '/games/[gameId]', params: { gameId } }} asChild>
+    <Link href={{ pathname: '/players/[playerId]', params: { playerId: playerSlug } }} asChild>
       <Pressable style={{ flex: 1 }}>{body}</Pressable>
     </Link>
   );
@@ -176,7 +178,7 @@ function SkaterTable({ rows, season }: { rows: SummarySkater[]; season: boolean 
     >
       {rows.map((r) => (
         <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
-          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} gameId={r.gameId} dnp={r.dnp} />
+          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} playerSlug={r.playerSlug} dnp={r.dnp} />
           {/* A row of zeroes would read as a player who took a regular shift and did nothing. */}
           {r.dnp ? (
             <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
@@ -213,7 +215,7 @@ function GoalieTable({ rows, season }: { rows: SummaryGoalie[]; season: boolean 
     >
       {rows.map((r) => (
         <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
-          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} gameId={r.gameId} dnp={r.dnp} />
+          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} playerSlug={r.playerSlug} dnp={r.dnp} />
           {r.dnp && !season ? (
             <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
           ) : season && !r.gp && r.nextGame ? (
