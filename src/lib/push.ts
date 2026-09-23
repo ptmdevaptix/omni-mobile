@@ -72,7 +72,20 @@ export async function pushPermissionStatus(): Promise<PushPermission> {
   return granted ? 'granted' : 'denied';
 }
 
-export async function postRegistration(token: string, prefs: NotificationPrefs, teams: string[]): Promise<boolean> {
+/**
+ * Mirror this device's subscriptions to the server, which is what actually sends.
+ *
+ * Followed PEOPLE travel as ids only — a star's player id, and the clubs whose prospect switch is
+ * on. Where each of them is playing is not sent and must not be: the watcher resolves that on every
+ * run, so a call-up or a trade moves the alerts without the device knowing anything happened.
+ */
+export async function postRegistration(
+  token: string,
+  prefs: NotificationPrefs,
+  teams: string[],
+  players: string[] = [],
+  prospectOrgs: string[] = [],
+): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/push/register`, {
       method: 'POST',
@@ -85,6 +98,8 @@ export async function postRegistration(token: string, prefs: NotificationPrefs, 
         events: prefs.events,
         teams,
         mutedTeams: prefs.mutedTeams,
+        players,
+        prospectOrgs,
       }),
     });
     return res.ok;
@@ -169,14 +184,18 @@ export function useNotificationTaps() {
  */
 export function usePushSync() {
   const { prefs, ready } = useNotificationPrefs();
-  const { favorites } = useFavorites();
+  const { favorites, favoritePlayers, prospectFollows, loaded } = useFavorites();
   const tokenRef = useRef<string | null>(null);
   const lastSent = useRef<string>('');
 
-  const signature = JSON.stringify({ e: prefs.enabled, v: prefs.events, m: prefs.mutedTeams, t: favorites });
+  const orgs = prospectFollows.map((f) => f.team);
+  // Every subscription is in the signature, or following a player would never reach the server.
+  const signature = JSON.stringify({
+    e: prefs.enabled, v: prefs.events, m: prefs.mutedTeams, t: favorites, p: favoritePlayers, o: orgs,
+  });
 
   useEffect(() => {
-    if (!ready) return;                     // don't post defaults before storage has loaded
+    if (!ready || !loaded) return;          // don't post defaults before storage has loaded
     if (!prefs.enabled && !tokenRef.current) return; // never enabled on this device — nothing to say
     if (signature === lastSent.current) return;
 
@@ -188,9 +207,10 @@ export function usePushSync() {
         token = result.token;
         tokenRef.current = token;
       }
-      if (await postRegistration(token, prefs, favorites)) lastSent.current = signature;
+      if (await postRegistration(token, prefs, favorites, favoritePlayers, orgs)) lastSent.current = signature;
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [ready, signature, prefs, favorites]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, loaded, signature]);
 }
