@@ -372,7 +372,9 @@ const styles = StyleSheet.create({
   statusBand: { justifyContent: 'center', paddingHorizontal: SIDE_CLEAR },
   // No card chrome: it is the bottom half of the header, not the first thing on the page.
   matchup: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  at: { textAlign: 'center', fontSize: 11, fontWeight: '700', marginTop: 3, marginBottom: -7 },
+  // Bigger than it reads: the line box is given room for the glyph and then pulled back up by the
+  // margin, so the symbol grows without the block growing with it.
+  at: { textAlign: 'center', fontSize: 15, lineHeight: 18, fontWeight: '700', marginTop: 0, marginBottom: -10 },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 4 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
   sbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
