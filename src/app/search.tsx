@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, Stack, useRouter } from 'expo-router';
+import { Stack, router, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -12,6 +12,18 @@ import { searchPlayers } from '@/lib/player';
 import { teamMatches } from '@/lib/team-search-terms';
 import type { PlayerSearchResult } from '@/lib/player-types';
 import { useTheme } from '@/lib/theme';
+
+/**
+ * Open a result on the stack BEHIND the search sheet, not inside it.
+ *
+ * Search is presented as a modal, so anything pushed from it was pushed into the modal — the player
+ * arrived as a second card sitting low on the screen that swiped away, rather than as his own page.
+ * Closing the sheet first puts the page where every other route to it lands.
+ */
+function openResult(href: Parameters<typeof router.push>[0]) {
+  if (router.canDismiss()) router.dismiss();
+  router.push(href);
+}
 
 // Search teams (local filter of /all-teams) + players (NHL player-search API).
 export default function SearchScreen() {
@@ -137,13 +149,11 @@ function TeamResult({ team }: { team: TeamDirectoryEntry }) {
   const { isFavorite, toggle } = useFavorites();
   return (
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
-      <Link href={{ pathname: '/teams/[teamId]', params: { teamId: team.id } }} asChild>
-        <Pressable style={styles.main}>
+      <Pressable style={styles.main} accessibilityRole="link" onPress={() => openResult({ pathname: '/teams/[teamId]', params: { teamId: team.id } })}>
           <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={30} />
           <Text style={{ flex: 1, color: t.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{team.name}</Text>
           <Text style={{ color: t.sub, fontSize: 12, fontWeight: '700' }}>{team.league}</Text>
-        </Pressable>
-      </Link>
+      </Pressable>
       <StarButton on={isFavorite(team.id)} onPress={() => toggle(team.id)} />
     </View>
   );
@@ -206,8 +216,7 @@ function PlayerResult({ player }: { player: PlayerSearchResult }) {
   const clubLeague = player.club?.league || player.league;
   return (
     <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
-      <Link href={{ pathname: '/players/[playerId]', params: { playerId: pid } }} asChild>
-        <Pressable style={styles.main}>
+      <Pressable style={styles.main} accessibilityRole="link" onPress={() => openResult({ pathname: '/players/[playerId]', params: { playerId: pid } })}>
           <PlayerCrest name={player.name} club={player.club} teamAbbrev={player.teamAbbrev} league={player.league} />
           {/* Position and number sit against the name because they qualify IT — this is what tells
               one Jack Smith from another when the names and the crests both match. The name shrinks
@@ -219,8 +228,7 @@ function PlayerResult({ player }: { player: PlayerSearchResult }) {
               `league` is the tier the ranking sorted on — NHL for anyone an NHL club owns — and beside
               a Hamilton crest it read as a contradiction. The club's own league agrees with the mark. */}
           {clubLeague ? <Text style={{ color: t.sub, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 }} numberOfLines={1}>{clubLeague.toUpperCase()}</Text> : null}
-        </Pressable>
-      </Link>
+      </Pressable>
       <StarButton on={isFavoritePlayer(pid)} onPress={() => togglePlayer(pid)} />
     </View>
   );
