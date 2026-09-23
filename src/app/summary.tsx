@@ -85,8 +85,9 @@ export default function SummaryScreen() {
   );
 }
 
-function NameCell({ name, club, clubLogo, league, nhlTeam, playerSlug, dnp }: {
-  name: string; club?: string; clubLogo?: string; league?: string; nhlTeam?: string; playerSlug?: string; dnp?: boolean;
+function NameCell({ name, club, clubLogo, league, nhlTeam, playerSlug, dnp, live }: {
+  name: string; club?: string; clubLogo?: string; league?: string; nhlTeam?: string;
+  playerSlug?: string; dnp?: boolean; live?: boolean;
 }) {
   const t = useTheme();
   const body = (
@@ -100,9 +101,13 @@ function NameCell({ name, club, clubLogo, league, nhlTeam, playerSlug, dnp }: {
               NHL: his rights and his club are the same crest, and showing it twice says nothing. */}
           {nhlTeam && league?.toUpperCase() !== 'NHL' ? <NhlCrest abbr={nhlTeam} size={14} /> : null}
         </View>
-        <Text style={{ color: t.subtle, fontSize: 10.5 }} numberOfLines={1}>
-          {[league, club].filter(Boolean).join(' · ')}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Text style={{ color: t.subtle, fontSize: 10.5, flexShrink: 1 }} numberOfLines={1}>
+            {[league, club].filter(Boolean).join(' · ')}
+          </Text>
+          {/* His game is still on, so his numbers are still moving. */}
+          {live ? <Text style={{ color: t.live, fontSize: 9, fontWeight: '800', letterSpacing: 0.4 }}>LIVE</Text> : null}
+        </View>
       </View>
     </View>
   );
@@ -178,7 +183,7 @@ function SkaterTable({ rows, season }: { rows: SummarySkater[]; season: boolean 
     >
       {rows.map((r) => (
         <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
-          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} playerSlug={r.playerSlug} dnp={r.dnp} />
+          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} playerSlug={r.playerSlug} dnp={r.dnp} live={r.live} />
           {/* A row of zeroes would read as a player who took a regular shift and did nothing. */}
           {r.dnp ? (
             <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
@@ -215,7 +220,7 @@ function GoalieTable({ rows, season }: { rows: SummaryGoalie[]; season: boolean 
     >
       {rows.map((r) => (
         <View key={r.key} style={[styles.row, { borderBottomColor: t.border }]}>
-          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} playerSlug={r.playerSlug} dnp={r.dnp} />
+          <NameCell name={r.name} club={r.club} clubLogo={r.clubLogo} league={r.league} nhlTeam={r.nhlTeam} playerSlug={r.playerSlug} dnp={r.dnp} live={r.live} />
           {r.dnp && !season ? (
             <Text style={{ color: t.subtle, fontSize: 11, fontWeight: '700' }}>DNP</Text>
           ) : season && !r.gp && r.nextGame ? (

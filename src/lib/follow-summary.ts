@@ -21,6 +21,8 @@ export type SummarySkater = {
   gameId?: string;
   /** Day only: his club played and he did not dress. */
   dnp?: boolean;
+  /** Day only: his game is still being played, so these figures are still moving. */
+  live?: boolean;
   /** Season only, and only with no games played: when his club next takes the ice. */
   nextGame?: NextGame;
 };
@@ -33,6 +35,7 @@ export type SummaryGoalie = {
   w?: number; l?: number; otl?: number; gaa?: number;
   gameId?: string;
   dnp?: boolean;
+  live?: boolean;
   nextGame?: NextGame;
 };
 
