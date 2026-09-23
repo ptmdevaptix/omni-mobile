@@ -128,24 +128,27 @@ export default function GameScreen() {
  * card, because a card passes the team ids and nothing else does — so the broken path was the one
  * every reader took and the working one was the only one easy to test.
  */
-function TeamName({ team, routeId }: { team: GDTeam; routeId?: string }) {
+function TeamName({ team, routeId, centered }: { team: GDTeam; routeId?: string; centered?: boolean }) {
   const t = useTheme();
   // The full name, composed the one way a full name is built — a repeat (HV71 HV71) collapses.
   const label = composeTeamName(team.name, team.nickname) || team.abbr;
   const body = (
     <>
       <TeamLogo uri={team.logo} darkUri={team.darkLogo} size={36} />
-      <View style={{ flex: 1 }}>
+      {/* Centred, the name sizes to itself so the pair sits in the middle; against a score column it
+          takes the room instead, so the numbers stay where the eye expects them. */}
+      <View style={centered ? { flexShrink: 1 } : { flex: 1 }}>
         <Text style={{ color: t.text, fontSize: 17, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
       </View>
     </>
   );
-  if (!routeId) return <View style={styles.teamRow}>{body}</View>;
+  const rowStyle = centered ? styles.teamRowCentered : styles.teamRow;
+  if (!routeId) return <View style={rowStyle}>{body}</View>;
   // Canonicalise: these ids come from the scoreboard, where CHL teams are keyed by league code
   // ("qmjhl-2") rather than the client code the /teams route and its endpoint expect.
   return (
     <Pressable
-      style={styles.teamRow}
+      style={rowStyle}
       accessibilityRole="link"
       accessibilityLabel={label}
       onPress={() => router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(routeId) } })}>
@@ -159,14 +162,18 @@ function Scoreboard({ g, awayId, homeId }: { g: GameDetail; awayId?: string; hom
   const played = g.status !== 'UPCOMING';
   const where = [g.seriesInfo, g.venue, g.venueLocation].filter(Boolean).join(' · ');
   const row = (team: GDTeam, id?: string) => (
-    <View style={styles.sbRow}>
-      <TeamName team={team} routeId={id} />
+    <View style={[styles.sbRow, !played && { justifyContent: 'center' as const }]}>
+      <TeamName team={team} routeId={id} centered={!played} />
       {played ? <Text style={{ color: t.text, fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'], minWidth: 44, textAlign: 'right' }}>{team.score ?? 0}</Text> : null}
     </View>
   );
   return (
     <View style={[styles.matchup, { borderBottomColor: t.border }]}>
       {row(g.awayTeam, awayId)}
+      {/* Away above, home below, as the matchup is said and written. Before a game there are no
+          scores to tell them apart, so the "@" does it — quiet enough not to be read as a score,
+          and tucked into the gap so the block barely grows. */}
+      {!played ? <Text style={[styles.at, { color: t.subtle }]}>@</Text> : null}
       {row(g.homeTeam, homeId)}
       {/* Where it is played and where to watch it are two different questions, and running them
           together wrapped mid-answer — "Scotiabank Arena · Toronto, ON · 📺" and then the channel
@@ -365,10 +372,12 @@ const styles = StyleSheet.create({
   statusBand: { justifyContent: 'center', paddingHorizontal: SIDE_CLEAR },
   // No card chrome: it is the bottom half of the header, not the first thing on the page.
   matchup: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  at: { textAlign: 'center', fontSize: 11, fontWeight: '700', marginTop: 3, marginBottom: -7 },
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 14, gap: 4 },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
   sbRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
   teamRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  teamRowCentered: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   lsRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
   lsTeam: { width: 44, fontSize: 13 },
   lsCell: { flex: 1, textAlign: 'center', fontSize: 13, fontVariant: ['tabular-nums'] },
