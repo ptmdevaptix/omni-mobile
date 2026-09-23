@@ -4,6 +4,7 @@ import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProspectFollowToggle } from '@/components/prospect-follow-toggle';
 import { StateView } from '@/components/state-view';
@@ -23,8 +24,12 @@ import { teamLinkLabel, useTeamLinks } from '@/lib/team-links';
 import { useTheme } from '@/lib/theme';
 import type { TeamHeader } from '@/lib/types';
 
+/** The iOS navigation bar's own height, under the status bar. Fixed on a phone. */
+const NAV_ROW = 44;
+
 export default function TeamScreen() {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const { isFavorite, toggle } = useFavorites();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
 
@@ -47,7 +52,22 @@ export default function TeamScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <Stack.Screen options={{ title: team?.abbr || 'Team' }} />
+      {/* The bar is transparent and empty, so the club's colour runs to the top of the screen and
+          the club's own name sits in the band the abbreviation used to have to itself. The star
+          takes the far side of that band, where there is nothing else. */}
+      <Stack.Screen
+        options={{
+          title: '',
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerRight: () =>
+            team ? (
+              <Pressable onPress={() => toggle(teamId)} hitSlop={10} accessibilityLabel={isFavorite(teamId) ? 'Remove favorite' : 'Add favorite'}>
+                <SymbolView name={isFavorite(teamId) ? 'star.fill' : 'star'} tintColor={isFavorite(teamId) ? '#f5a623' : t.subtle} size={24} />
+              </Pressable>
+            ) : null,
+        }}
+      />
 
       {q.isError ? (
         <StateView kind="error" message="Couldn’t load this team." onRetry={() => q.refetch()} />
@@ -55,7 +75,7 @@ export default function TeamScreen() {
         <StateView kind="loading" />
       ) : (
         <>
-          <View style={[styles.hero, { borderColor: t.border }]}>
+          <View style={[styles.hero, { borderColor: t.border, paddingTop: insets.top }]}>
             {/* The club's own colour behind its name, as the web's header wears it — a wash rather
                 than a block, so the text above keeps the contrast the rest of the app has. No crest
                 watermark: it landed under the ★, and the crest is already beside the name. */}
@@ -68,13 +88,18 @@ export default function TeamScreen() {
                 pointerEvents="none"
               />
             ) : null}
-            {team.logo ? <TeamLogo uri={team.logo} size={52} /> : null}
-            <View style={{ flex: 1 }}>
+            {/* Crest and name ride in the navigation band itself, inset past the back chevron on one
+                side and the star on the other. That is the row the page used to spend on "NYI". */}
+            <View style={styles.identity}>
+              {team.logo ? <TeamLogo uri={team.logo} size={30} /> : null}
               {/* A club whose nickname IS its place — HV71, Färjestad BK — is named once. */}
-              <Text style={{ color: t.text, fontSize: 20, fontWeight: '800' }} numberOfLines={1}>
+              <Text style={{ color: t.text, fontSize: 19, fontWeight: '800', flexShrink: 1 }} numberOfLines={1}>
                 {composeTeamName(team.name, team.nickname)}
               </Text>
-              <Text style={{ color: t.sub, fontSize: 13, marginTop: 1 }} numberOfLines={1}>
+            </View>
+
+            <View style={{ paddingHorizontal: 16, alignItems: 'center' }}>
+              <Text style={{ color: t.sub, fontSize: 13, textAlign: 'center' }} numberOfLines={1}>
                 {/* A league with no divisions files each club under the league's own name
                     ("SHL · SHL"); the second copy says nothing. */}
                 {[
@@ -90,7 +115,7 @@ export default function TeamScreen() {
                   deliberately: an unverified club shows no link rather than a guessed one. */}
               {/* The prospect switch, for an NHL club: its affiliates join your teams and its
                   prospects' games ride with your favorites (docs/design/prospect-follows.md). */}
-              {leagueOf(teamId) === 'NHL' ? <View style={{ marginTop: 6 }}><ProspectFollowToggle team={teamId} /></View> : null}
+              {leagueOf(teamId) === 'NHL' ? <View style={{ marginTop: 6, alignItems: 'center' }}><ProspectFollowToggle team={teamId} /></View> : null}
               {/* The org's other clubs, each a tap away: an NHL club's farm teams, or the parent of
                   a club that has one. The web gives these a line each; one wrapping row fits a phone. */}
               {affiliates.length > 0 ? (
@@ -107,7 +132,7 @@ export default function TeamScreen() {
                 </View>
               ) : null}
               {links.length > 0 ? (
-                <View style={{ flexDirection: 'row', gap: 14, marginTop: 5 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, marginTop: 5 }}>
                   {links.map((link) => (
                     <Pressable
                       key={link.linkType}
@@ -122,9 +147,6 @@ export default function TeamScreen() {
                 </View>
               ) : null}
             </View>
-            <Pressable onPress={() => toggle(teamId)} hitSlop={10} accessibilityLabel={isFavorite(teamId) ? 'Remove favorite' : 'Add favorite'}>
-              <SymbolView name={isFavorite(teamId) ? 'star.fill' : 'star'} tintColor={isFavorite(teamId) ? '#f5a623' : t.subtle} size={26} />
-            </Pressable>
           </View>
 
           <TeamTabsBar tabs={tabs} value={tab} onChange={setTab} />
@@ -144,8 +166,14 @@ export default function TeamScreen() {
 }
 
 const styles = StyleSheet.create({
-  affRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 6 },
+  affRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6 },
   affChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // overflow hidden so the colour wash and the crest watermark stop at the header's own edge.
-  hero: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  // A column now, not a row: the first line shares the navigation band and the rest runs full width.
+  // overflow hidden so the colour wash stops at the header's own edge.
+  hero: { paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  // Centred, with equal clearance for the two controls already in that band: iOS draws each of them
+  // on a round ground about 40pt across, not as a bare glyph, so the clearance is the circle's.
+  // Centring is also what keeps the name off them — it grows from the middle outwards, not into one.
+  identity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: NAV_ROW, paddingHorizontal: 62 },
 });
