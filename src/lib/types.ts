@@ -4,6 +4,8 @@
 
 export type ScoreGame = {
   id: string;
+  /** IANA zone of the arena, for showing the start on its clock (lib/game-time); absent when the feed does not say. */
+  venueTimeZone?: string;
   // Top-level league tab: "NHL" | "AHL" | "CHL" | "NCAA" | "USHL". NOTE this is *not* the sub-league —
   // OHL/WHL/QMJHL games all carry top: "CHL". Use gameLeague() from lib/leagues to get the real one.
   top: string;

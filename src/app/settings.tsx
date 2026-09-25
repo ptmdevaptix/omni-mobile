@@ -13,6 +13,7 @@ import { fetchPlayer } from '@/lib/player';
 import { isSharingPrefs, setSharingPrefs } from '@/lib/pref-telemetry';
 import { acquirePushToken, pushPermissionStatus, type PushPermission } from '@/lib/push';
 import { useTheme } from '@/lib/theme';
+import { useTimeZoneMode } from '@/lib/time-zone-mode';
 
 type Row = { id: string; name: string; logo?: string; darkLogo?: string; league: string };
 
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
     prefs, setEnabled, setEvent, setTeamEnabled, isTeamEnabled,
     setPinnedAlerts, setProspectsEnabled, setPlayerEnabled, isPlayerEnabled,
   } = useNotificationPrefs();
+  const { mode: timeMode, setMode: setTimeMode } = useTimeZoneMode();
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
   // On by default, so it is read rather than assumed — a device that has declined must not show the
@@ -154,6 +156,32 @@ export default function SettingsScreen() {
             </View>
           </>
         ) : null}
+      </View>
+
+      {/* ── Game times: whose clock start times are on (lib/game-time) ─── */}
+      <View style={{ gap: 8 }}>
+        <Text style={[styles.header, { color: t.sub }]}>GAME TIMES</Text>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+          {([
+            { value: 'mine', label: 'Your time zone', detail: 'Every start time on your phone’s clock' },
+            { value: 'arena', label: 'Arena Time Zone', detail: 'The time where the game is played, with its zone — “7:00 PM PT”' },
+          ] as const).map((o, i) => (
+            <Pressable
+              key={o.value}
+              onPress={() => setTimeMode(o.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: timeMode === o.value }}
+              style={[styles.row, i > 0 && { borderTopColor: t.border, borderTopWidth: StyleSheet.hairlineWidth }]}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ color: t.text, fontSize: 15 }}>{o.label}</Text>
+                <Text style={{ color: t.subtle, fontSize: 11, marginTop: 1 }}>{o.detail}</Text>
+              </View>
+              {timeMode === o.value ? <SymbolView name="checkmark" size={16} tintColor={t.accent} /> : null}
+            </Pressable>
+          ))}
+        </View>
+        <Text style={[styles.note, { color: t.subtle }]}>Synced with your other devices, and the same switch as on the web.</Text>
       </View>
 
       {/* ── Favorite teams: order + per-team mute ─────────────────────── */}

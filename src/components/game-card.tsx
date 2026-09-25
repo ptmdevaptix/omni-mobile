@@ -8,6 +8,8 @@ import { DaysOutSquares } from '@/components/days-out';
 import { TeamLogo } from '@/components/team-logo';
 import { canonicalTeamId } from '@/lib/api';
 import { cardDate } from '@/lib/format';
+import { formatGameTime } from '@/lib/game-time';
+import { useTimeZoneMode } from '@/lib/time-zone-mode';
 import { gameLeague, isInterleague } from '@/lib/leagues';
 import { teamDisplayName } from '@/lib/team-name';
 import { useTheme } from '@/lib/theme';
@@ -55,6 +57,13 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const done = game.status === 'FINAL' || game.status === 'LIVE';
   const live = game.status === 'LIVE';
   const dateLabel = cardDate(game.startTimeUTC, game.gameDate);
+  // A game yet to start shows its start on the reader's chosen clock (lib/game-time) rather than the
+  // feed's own label, which was the league's habit — "7:30 PM ET" from the NHL, a bare "7:00 PM" in
+  // the arena's zone from HockeyTech. Once it is on, the feed's clock and period are what it says.
+  const { mode } = useTimeZoneMode();
+  const timeLabel = game.status === 'UPCOMING' && game.startTimeUTC
+    ? formatGameTime(game.startTimeUTC, { mode, venueTimeZone: game.venueTimeZone, compact })
+    : game.statusLabel;
 
   // Winner/loser only for FINAL games with both scores (dim the loser + wedge at the winner).
   const final = game.status === 'FINAL' && game.awayScore != null && game.homeScore != null;
@@ -85,7 +94,7 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const status = (size: number) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
       <Text style={{ color: live ? t.live : t.sub, fontSize: size, fontWeight: live ? '700' : compact ? '500' : '400', flexShrink: 1 }} numberOfLines={1}>
-        {[dateLabel || null, game.statusLabel].filter(Boolean).join(' · ')}
+        {[dateLabel || null, timeLabel].filter(Boolean).join(' · ')}
       </Text>
     </View>
   );
@@ -251,7 +260,7 @@ function areEqual(a: GameCardProps, b: GameCardProps): boolean {
   // only ever pins this card's own game.
   if (a.followed !== b.followed || a.pinned !== b.pinned || !!a.onTogglePin !== !!b.onTogglePin) return false;
   if (JSON.stringify(a.reason?.items ?? null) !== JSON.stringify(b.reason?.items ?? null)) return false;
-  if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel
+  if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel || g1.startTimeUTC !== g2.startTimeUTC || g1.venueTimeZone !== g2.venueTimeZone
     || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network || g1.networkUrl !== g2.networkUrl) return false;
   return teamEq(a.teams[g1.awayTeamId], b.teams[g2.awayTeamId]) && teamEq(a.teams[g1.homeTeamId], b.teams[g2.homeTeamId]);
 }

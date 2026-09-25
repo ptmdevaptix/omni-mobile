@@ -21,8 +21,10 @@ import { AppState } from 'react-native';
 import { API_BASE, CLIENT_ID } from '@/lib/api';
 import { useFavorites, type FavoriteTeam, type PinnedGame, type ProspectFollow } from '@/lib/favorites';
 import { useFollowedLeagues, type FollowedLeague } from '@/lib/followed-leagues';
+import type { TimeZoneMode } from '@/lib/game-time';
 import { fetchAllTeams } from '@/lib/leagues';
 import { nameFromSlug } from '@/lib/pref-telemetry';
+import { useTimeZoneMode } from '@/lib/time-zone-mode';
 import { useDerivedClubs } from '@/lib/use-follows';
 
 const ACCOUNT_KEY = 'syncAccountId';
@@ -41,6 +43,8 @@ type ServerPrefs = {
   prospects: ProspectFollow[];
   /** Absent from a server whose database has no column for pins yet — keep this device's own. */
   pinnedGames?: PinnedGame[];
+  /** Whose clock start times are on (lib/game-time). Null: never chosen. Absent: the server cannot hold it yet. */
+  timeZoneMode?: TimeZoneMode | null;
 };
 
 async function call<T>(path: string, init?: RequestInit): Promise<{ status: number; body: T | null }> {
@@ -81,6 +85,7 @@ const SyncContext = createContext<Ctx>({
 export function SyncProvider({ children }: { children: ReactNode }) {
   const fav = useFavorites();
   const leagues = useFollowedLeagues();
+  const tz = useTimeZoneMode();
   const dir = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
   const { clubs } = useDerivedClubs();
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -122,13 +127,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       players: fav.favoritePlayers.map((id) => ({ id, name: named.find((p) => p.starIds.includes(id))?.name || nameFromSlug(id) })),
       prospects: fav.prospectFollows,
       pinnedGames: fav.pinnedGames,
+      timeZoneMode: tz.chosen ? tz.mode : null,
     };
-  }, [fav.favoriteTeams, fav.favoritePlayers, fav.prospectFollows, fav.pinnedGames, leagues.customized, leagues.followed, dir.data, clubs, defaultLeague]);
+  }, [tz.chosen, tz.mode, fav.favoriteTeams, fav.favoritePlayers, fav.prospectFollows, fav.pinnedGames, leagues.customized, leagues.followed, dir.data, clubs, defaultLeague]);
 
   // What counts as a change worth sending — ids only, so a name arriving from the directory is not one.
   const sigOf = (p: ServerPrefs) => JSON.stringify([
     p.favorites.map((t) => `${t.id}:${t.via ?? ''}`), p.followedLeagues, p.players.map((x) => x.id),
-    p.prospects.map((x) => x.team), (p.pinnedGames ?? []).map((x) => x.id), p.defaultLeague,
+    p.prospects.map((x) => x.team), (p.pinnedGames ?? []).map((x) => x.id), p.defaultLeague, p.timeZoneMode ?? null,
   ]);
 
   const apply = useCallback((p: ServerPrefs) => {
@@ -142,9 +148,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     });
     // Null: the account never chose its leagues, so this device keeps its own default.
     if (p.followedLeagues) leagues.replaceFollowed(p.followedLeagues);
-    lastSig.current = sigOf({ ...p, pinnedGames: p.pinnedGames ?? fav.pinnedGames });
+    if (p.timeZoneMode === 'mine' || p.timeZoneMode === 'arena') tz.setMode(p.timeZoneMode);
+    lastSig.current = sigOf({
+      ...p,
+      pinnedGames: p.pinnedGames ?? fav.pinnedGames,
+      timeZoneMode: p.timeZoneMode === 'mine' || p.timeZoneMode === 'arena' ? p.timeZoneMode : tz.chosen ? tz.mode : null,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fav.replaceAll, leagues.replaceFollowed, fav.pinnedGames]);
+  }, [fav.replaceAll, leagues.replaceFollowed, fav.pinnedGames, tz.setMode, tz.chosen, tz.mode]);
 
   const pull = useCallback(async (id: string) => {
     const { status, body } = await call<ServerPrefs>(`/sync/preferences?accountId=${encodeURIComponent(id)}`);
@@ -156,7 +167,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // the other device may have changed something while this one was away.
   const pullRef = useRef(pull);
   useEffect(() => { pullRef.current = pull; }, [pull]);
-  const loaded = ready && fav.loaded && leagues.loaded;
+  const loaded = ready && fav.loaded && leagues.loaded && tz.loaded;
   useEffect(() => {
     if (!loaded || !accountId) return;
     void pullRef.current(accountId);

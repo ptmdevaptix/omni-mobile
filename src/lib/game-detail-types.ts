@@ -42,6 +42,8 @@ export type GameDetail = {
   status: 'LIVE' | 'FINAL' | 'UPCOMING';
   statusLabel: string;
   startTimeUTC?: string;
+  /** The arena's zone, for showing the start on its clock (lib/game-time). */
+  venueTimeZone?: string;
   venue?: string;
   venueLocation?: string;
   seriesInfo?: string;

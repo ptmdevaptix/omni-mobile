@@ -37,6 +37,8 @@ export type ScheduleGame = {
   id: number;
   date: string;
   startTimeUTC: string;
+  /** The arena's zone, for showing the start on its clock (lib/game-time). */
+  venueTimeZone?: string;
   opponentAbbr: string;
   opponentName?: string;
   opponentId?: string;
@@ -79,7 +81,7 @@ export type MiniGame = {
   id: number; date: string; opponentAbbr: string; opponentName?: string; opponentId?: string;
   opponentLogo: string; opponentDarkLogo: string; isHome: boolean;
   teamScore?: number; opponentScore?: number; result?: 'W' | 'L' | 'OTL'; overtime?: 'OT' | 'SO';
-  state: 'FINAL' | 'UPCOMING'; startTimeUTC?: string; postseason?: string;
+  state: 'FINAL' | 'UPCOMING'; startTimeUTC?: string; venueTimeZone?: string; postseason?: string;
 };
 export type DivTeam = {
   id?: string; abbr: string; name: string; logo: string; darkLogo: string;

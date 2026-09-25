@@ -18,7 +18,9 @@ import { useFollowedMatcher } from '@/lib/use-follows';
 import { fetchGameDetail } from '@/lib/game';
 import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo } from '@/lib/game-detail-types';
 import { composeTeamName } from '@/lib/team-name';
+import { formatGameTime, type TimeZoneMode } from '@/lib/game-time';
 import { useTheme } from '@/lib/theme';
+import { useTimeZoneMode } from '@/lib/time-zone-mode';
 import { useDerivedClubs } from '@/lib/use-follows';
 
 /**
@@ -42,14 +44,19 @@ const SIDE_CLEAR = 62;
  * date and the face-off time. A generic "Upcoming" is dropped when there is a date to show instead —
  * it says nothing the date does not — and kept when there is not.
  */
-function bandLabel(g: GameDetail, gameId: string): string {
+function bandLabel(g: GameDetail, gameId: string, mode: TimeZoneMode): string {
   if (g.status !== 'UPCOMING') return g.statusLabel ?? '';
   const when = shortDate(g.startTimeUTC) || shortDate(dateFromGameId(gameId));
-  const label = /^upcoming$/i.test((g.statusLabel ?? '').trim()) ? '' : g.statusLabel ?? '';
+  // The start on the reader's chosen clock (lib/game-time), as every card shows it; the feed's own
+  // label only when there is no start time to format.
+  const label = g.startTimeUTC
+    ? formatGameTime(g.startTimeUTC, { mode, venueTimeZone: g.venueTimeZone })
+    : /^upcoming$/i.test((g.statusLabel ?? '').trim()) ? '' : g.statusLabel ?? '';
   return [when, when && label === when ? '' : label].filter(Boolean).join(' · ') || g.statusLabel || '';
 }
 
 export default function GameScreen() {
+  const { mode: timeMode } = useTimeZoneMode();
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const { gameId, away, home } = useLocalSearchParams<{ gameId: string; away?: string; home?: string }>();
@@ -80,7 +87,7 @@ export default function GameScreen() {
           adjustsFontSizeToFit
           minimumFontScale={0.85}
           style={{ color: g?.status === 'LIVE' ? t.live : t.text, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>
-          {g ? bandLabel(g, gameId) : ''}
+          {g ? bandLabel(g, gameId, timeMode) : ''}
         </Text>
       </View>
       {/* The two clubs sit in the same block as the state above them, the way the team page's crest

@@ -55,6 +55,8 @@ export function gameIsFollowed(g: ScoreGame, followed: ReadonlySet<string>): boo
 
 export type NextGameInfo = {
   teamId: string; gameId: string; date: string; startTimeUTC?: string;
+  /** The arena's zone (lib/game-time). */
+  venueTimeZone?: string;
   /** The opponent's PLACE ("Belleville", "Rögle"), which is how a non-NHL card names it. */
   opponentName: string; opponentAbbr: string; opponentLogo?: string; opponentDarkLogo?: string;
   isHome: boolean;
@@ -113,6 +115,7 @@ export function nextGameAsCard(
     status: 'UPCOMING',
     statusLabel: info.startTimeUTC ? timeOfDay(info.startTimeUTC) : 'TBD',
     startTimeUTC: info.startTimeUTC,
+    venueTimeZone: info.venueTimeZone,
     gameDate: info.date,
     preseason: info.preseason || undefined,
   };

@@ -7,14 +7,16 @@ import { MiniStandings } from '@/components/standings-card';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { leagueOf } from '@/lib/api';
-import { seasonOf, shortDate, timeOfDay } from '@/lib/format';
+import { seasonOf, shortDate } from '@/lib/format';
 import { fetchAllTeams, leagueColors, type LeagueId } from '@/lib/leagues';
 import { fetchTeamNews } from '@/lib/news';
 import { NHL_TEAM_NAMES } from '@/lib/nhl-teams';
 import { fetchTeamHome } from '@/lib/team';
 import type { StandingsCardGroup, StandingsZone } from '@/lib/standings-cards';
 import type { Leader, MiniGame, TeamHomeData } from '@/lib/team-types';
+import { formatGameTime } from '@/lib/game-time';
 import { useTheme } from '@/lib/theme';
+import { useTimeZoneMode } from '@/lib/time-zone-mode';
 
 export function TeamHome({ teamId }: { teamId: string }) {
   const t = useTheme();
@@ -107,6 +109,7 @@ function SeasonDivider() {
 
 function MiniGameRow({ g }: { g: MiniGame }) {
   const t = useTheme();
+  const { mode } = useTimeZoneMode();
   const rc = g.result === 'W' ? '#22c55e' : g.result === 'L' ? '#ef4444' : t.sub;
   return (
     <View style={styles.mg}>
@@ -117,7 +120,7 @@ function MiniGameRow({ g }: { g: MiniGame }) {
       {g.state === 'FINAL' ? (
         <Text style={{ color: rc, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{g.result} {g.teamScore}-{g.opponentScore}{g.overtime ? ` ${g.overtime}` : ''}</Text>
       ) : (
-        <Text style={{ color: t.sub, fontSize: 12 }}>{timeOfDay(g.startTimeUTC) || 'TBD'}</Text>
+        <Text style={{ color: t.sub, fontSize: 12 }}>{g.startTimeUTC ? formatGameTime(g.startTimeUTC, { mode, venueTimeZone: g.venueTimeZone }) || 'TBD' : 'TBD'}</Text>
       )}
     </View>
   );

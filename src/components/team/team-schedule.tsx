@@ -7,11 +7,13 @@ import { SegmentedFilter } from '@/components/segmented-filter';
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
 import { leagueOf } from '@/lib/api';
-import { shortDate, timeOfDay } from '@/lib/format';
+import { shortDate } from '@/lib/format';
 import { detectRegion } from '@/lib/region';
 import { fetchTeamSchedule } from '@/lib/team';
 import type { ScheduleGame } from '@/lib/team-types';
+import { formatGameTime } from '@/lib/game-time';
 import { useTheme } from '@/lib/theme';
+import { useTimeZoneMode } from '@/lib/time-zone-mode';
 
 /** Which country's networks to show. A Canadian and an American reader want different lines. */
 type Country = 'CA' | 'US';
@@ -92,6 +94,7 @@ function networksFor(g: ScheduleGame, country: Country): { network: string; scop
 
 function GameRow({ g, country, onPress }: { g: ScheduleGame; country: Country; onPress?: () => void }) {
   const t = useTheme();
+  const { mode } = useTimeZoneMode();
   const dark = t.mode === 'dark';
   const resultColor = g.result === 'W' ? '#22c55e' : g.result === 'L' ? '#ef4444' : t.sub;
   const nets = g.state === 'FINAL' ? [] : networksFor(g, country);
@@ -114,7 +117,7 @@ function GameRow({ g, country, onPress }: { g: ScheduleGame; country: Country; o
         ) : g.state === 'POSTPONED' ? (
           <Text style={{ color: t.subtle, fontSize: 12 }}>PPD</Text>
         ) : (
-          <Text style={{ color: t.sub, fontSize: 13 }}>{timeOfDay(g.startTimeUTC) || '—'}</Text>
+          <Text style={{ color: t.sub, fontSize: 13 }}>{g.startTimeUTC ? formatGameTime(g.startTimeUTC, { mode, venueTimeZone: g.venueTimeZone }) || '—' : '—'}</Text>
         )}
       </View>
       {nets.length ? (
