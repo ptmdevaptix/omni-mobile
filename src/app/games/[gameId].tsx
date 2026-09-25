@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { GameBoxScore, ScratchesCard } from '@/components/game-box-score';
@@ -59,16 +59,29 @@ export default function GameScreen() {
   const { mode: timeMode } = useTimeZoneMode();
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { gameId, away, home } = useLocalSearchParams<{ gameId: string; away?: string; home?: string }>();
+  const { gameId, away, home, fresh } = useLocalSearchParams<{ gameId: string; away?: string; home?: string; fresh?: string }>();
+  // Opened from a notification: `fresh` is when it was tapped (lib/push useNotificationTaps).
+  const freshAt = Number(fresh) || 0;
 
   const [tab, setTab] = useState('Summary');
+  // The first load after a tap goes around the edge cache, whose copy of a live game can be from
+  // before the goal the alert announced; the watcher has already refreshed the server's copy.
+  const bypassed = useRef(false);
   const q = useQuery({
     queryKey: ['game', gameId],
-    queryFn: () => fetchGameDetail(gameId),
+    queryFn: () => {
+      const bypass = freshAt > 0 && !bypassed.current;
+      bypassed.current = true;
+      return fetchGameDetail(gameId, bypass ? String(freshAt) : undefined);
+    },
+    refetchOnMount: 'always',
     refetchInterval: (query) => (query.state.data?.status === 'LIVE' ? 15_000 : false),
   });
 
-  const g = q.data;
+  // A copy loaded before the tap — this game was on Home, say — is not shown while the fresh one is
+  // on its way: a moment of loading beats a score the reader has just been told is wrong.
+  const staleForTap = freshAt > 0 && q.dataUpdatedAt < freshAt;
+  const g = staleForTap ? undefined : q.data;
   // The user's followed players on this game, for the strip and the starred lineup rows.
   const { clubs } = useDerivedClubs();
   const followed = followedOnGame(g, clubs);
@@ -93,7 +106,7 @@ export default function GameScreen() {
       {/* The two clubs sit in the same block as the state above them, the way the team page's crest
           and name sit with theirs — one top section, not a band and then a floating card. */}
       {g ? <Scoreboard g={g} awayId={away} homeId={home} /> : null}
-      {q.isLoading ? (
+      {q.isLoading || (staleForTap && !q.isError) ? (
         <StateView kind="loading" />
       ) : q.isError || !g ? (
         <StateView kind="empty" title="Game details unavailable" message="We couldn’t load this game." onRetry={() => q.refetch()} />

@@ -175,7 +175,9 @@ export function useNotificationTaps() {
   // exactly like "the notification just opens the app".
   useEffect(() => {
     if (!pendingGameId || !navState?.key) return;
-    router.push({ pathname: '/games/[gameId]', params: { gameId: pendingGameId } });
+    // `fresh`: when it was tapped. The game screen will not show a copy of the game older than
+    // that — the alert said "2-0", and a cached 1-0 from before the goal read as the app being wrong.
+    router.push({ pathname: '/games/[gameId]', params: { gameId: pendingGameId, fresh: String(Date.now()) } });
     setPendingGameId(null);
   }, [pendingGameId, navState?.key, router]);
 }
