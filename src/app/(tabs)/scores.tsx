@@ -183,13 +183,20 @@ function SlatePage({ league, date, width }: { league: PickerId; date?: string; w
 
   // Favorites lead their league's slate and wear the metallic frame — the one place a favorite sits
   // among its peers, so the marker earns its keep here (Home's Favorites section is its own header).
-  const { favorites } = useFavorites();
+  // Games pinned for today come next, after the favorites and without their frame — the pin in the
+  // card's corner says why they are up top.
+  const { favorites, pinnedGames, togglePin } = useFavorites();
   const favIds = useMemo(() => favMatchIds(favorites), [favorites]);
+  const pinnedIds = useMemo(() => new Set(pinnedGames.map((p) => p.id)), [pinnedGames]);
+  const today = dayKey();
+  // Only today's slate can be pinned; a pin lasts for its own day.
+  const pinnable = date === today;
   const games = useMemo(() => {
     const all = data?.games ?? [];
-    if (!favIds.size) return all;
-    return [...all].sort((a, b) => Number(isFavGame(b, favIds)) - Number(isFavGame(a, favIds))); // stable
-  }, [data, favIds]);
+    if (!favIds.size && !pinnedIds.size) return all;
+    const rank = (g: ScoreGame) => (isFavGame(g, favIds) ? 0 : pinnedIds.has(g.id) ? 1 : 2);
+    return [...all].sort((a, b) => rank(a) - rank(b)); // stable
+  }, [data, favIds, pinnedIds]);
   const teams = data?.teamsById ?? {};
   // Sub-headings before each run: a block splits by member league (OHL, then WHL, then QMJHL), the
   // NCAA by conference (Non-Conference last). Every other league is one flat run, and so is a block
@@ -226,7 +233,16 @@ function SlatePage({ league, date, width }: { league: PickerId; date?: string; w
               <SubHeading title={item.heading} />
             ) : (
               <View style={compact ? { flexDirection: 'row', gap: 10 } : undefined}>
-                {item.map((g) => <GameCard key={g.id} game={g} teams={teams} cardColor={c.card} compact={compact} featured={isFavGame(g, favIds)} starred={isFavGame(g, favIds)} />)}
+                {item.map((g) => {
+                  const starred = isFavGame(g, favIds);
+                  return (
+                    <GameCard
+                      key={g.id} game={g} teams={teams} cardColor={c.card} compact={compact} featured={starred} starred={starred}
+                      pinned={pinnedIds.has(g.id)}
+                      onTogglePin={pinnable && !starred ? () => togglePin(g.id, today) : undefined}
+                    />
+                  );
+                })}
                 {compact && item.length === 1 ? <View style={{ flex: 1 }} /> : null}
               </View>
             )

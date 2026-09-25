@@ -51,10 +51,13 @@ type Ctx = {
   unfollow: (target: FollowTarget) => void;
   /** True when every league the target stands for is followed — so "CHL" means all three. */
   isFollowed: (target: FollowTarget) => boolean;
+  /** Replace the whole list — another device's choice arriving through sync (lib/sync). */
+  replaceFollowed: (next: FollowedLeague[]) => void;
 };
 
 const FollowedLeaguesContext = createContext<Ctx>({
   followed: [...DEFAULT_FOLLOWED_LEAGUES], loaded: false, customized: false, follow: () => {}, unfollow: () => {}, isFollowed: () => false,
+  replaceFollowed: () => {},
 });
 
 export function FollowedLeaguesProvider({ children }: { children: ReactNode }) {
@@ -98,9 +101,13 @@ export function FollowedLeaguesProvider({ children }: { children: ReactNode }) {
     return wanted.length > 0 && wanted.every((l) => followed.includes(l));
   }, [followed]);
 
+  const replaceFollowed = useCallback((next: FollowedLeague[]) => {
+    write([...new Set(next.flatMap(expandFollowTarget))]);
+  }, [write]);
+
   const value = useMemo(
-    () => ({ followed, loaded, customized, follow, unfollow, isFollowed }),
-    [followed, loaded, customized, follow, unfollow, isFollowed],
+    () => ({ followed, loaded, customized, follow, unfollow, isFollowed, replaceFollowed }),
+    [followed, loaded, customized, follow, unfollow, isFollowed, replaceFollowed],
   );
   return <FollowedLeaguesContext.Provider value={value}>{children}</FollowedLeaguesContext.Provider>;
 }

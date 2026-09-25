@@ -1,7 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { GameCard, type FollowReason } from '@/components/game-card';
@@ -48,9 +47,12 @@ function sectionRows(s: Section, per: number): Row[] {
 const isHeading = (r: Row): r is { heading: string } => !Array.isArray(r);
 
 const STATUS_RANK: Record<string, number> = { LIVE: 0, FINAL: 1, UPCOMING: 2 };
-/** The Favorites block is never bare: the nearest future cards fill in up to this floor. */
-const FAV_MIN_CARDS = 2;
-const FAV_MORE_KEY = 'favoritesMore';
+/** The Favorites block is never bare: the nearest future cards fill in up to this floor — in rows of
+ *  one card, or of two in compact mode, so compact shows twice the cards in the same height. */
+const FAV_MIN_ROWS = 2;
+/** How many ROWS of today's cards the folded Favorites block shows before "Show more": six cards in
+ *  the full layout, as on the web, twelve in compact — the point of compact is to fit more. */
+const FAV_TODAY_ROWS = 6;
 const byStatus = (a: ScoreGame, b: ScoreGame) =>
   (STATUS_RANK[a.status] ?? 3) - (STATUS_RANK[b.status] ?? 3) || (a.startTimeUTC ?? '').localeCompare(b.startTimeUTC ?? '');
 
@@ -61,7 +63,8 @@ const byStatus = (a: ScoreGame, b: ScoreGame) =>
 // where they say otherwise. Same rules as the web Home (app/home-view.tsx).
 export default function HomeScreen() {
   const t = useTheme();
-  const { favorites, favoriteTeams } = useFavorites();
+  const { favorites, favoriteTeams, pinnedGames, togglePin } = useFavorites();
+  const pinnedIds = useMemo(() => new Set(pinnedGames.map((p) => p.id)), [pinnedGames]);
   const { followed, loaded: followedLoaded, customized } = useFollowedLeagues();
   // Derived favorites: the clubs the user's followed players play for (lib/use-follows).
   const { clubs: derivedClubs } = useDerivedClubs();
@@ -71,11 +74,9 @@ export default function HomeScreen() {
   const { compact } = useCompact();
   const today = dayKey();
   const listRef = useRef<SectionList<Row, RowSection>>(null);
-  // Whether the days ahead are unfolded. Remembered across visits: a reader who wants the long view
-  // should not have to ask for it every morning.
-  const [moreOpen, setMoreOpenState] = useState(false);
-  useEffect(() => { AsyncStorage.getItem(FAV_MORE_KEY).then((v) => { if (v === '1') setMoreOpenState(true); }).catch(() => {}); }, []);
-  const setMoreOpen = (v: boolean) => { setMoreOpenState(v); AsyncStorage.setItem(FAV_MORE_KEY, v ? '1' : '0').catch(() => {}); };
+  // Whether the rest of the Favorites is unfolded. Folded on every visit, as on the web: with enough
+  // favorites, followed prospects and next games the block ran to forty cards every morning.
+  const [moreOpen, setMoreOpen] = useState(false);
   // League sections the reader has put away. Not remembered: the web does not either, and a section
   // shut on Tuesday is not what a reader wants shut on Saturday.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
@@ -108,12 +109,14 @@ export default function HomeScreen() {
   const favIds = useMemo(() => favMatchIds(favorites), [favorites]);
   const followedSet = useMemo(() => new Set<string>(followed), [followed]);
 
-  // Today's games Home cares about: followed leagues, anything involving a favorite, and anything
-  // a followed player is on.
+  // Today's games Home cares about: followed leagues, anything involving a favorite, anything a
+  // followed player is on, and any game pinned for today — whatever its league.
   const todayGames = useMemo(
-    () => (data?.games ?? []).filter((g) => gameIsFollowed(g, followedSet) || isFavGame(g, favIds) || followReasonItems(g, derived, affiliateOf).length > 0),
-    [data, followedSet, favIds, derived, affiliateOf],
+    () => (data?.games ?? []).filter((g) => gameIsFollowed(g, followedSet) || isFavGame(g, favIds) || pinnedIds.has(g.id) || followReasonItems(g, derived, affiliateOf).length > 0),
+    [data, followedSet, favIds, pinnedIds, derived, affiliateOf],
   );
+  // Only today's slate can be pinned — the look-ahead and next-game cards are other days.
+  const todayIds = useMemo(() => new Set((data?.games ?? []).map((g) => g.id)), [data]);
 
   // Favorites without a game today → their next game, one request for all of them. Cheap and cached;
   // in season most favorites play most days and this returns little. A followed player's club gets
@@ -164,8 +167,8 @@ export default function HomeScreen() {
       Object.assign(teams, extra);
       nextCards.push(game);
     }
-    return { sections: buildSections(todayGames, favIds, followed, nextCards, lookQ.data ?? [], today, moreOpen, compact ? 2 : 1, derived, affiliateOf), teams, nextCards };
-  }, [data, todayGames, favIds, followed, idle, nextQ.data, lookQ.data, teamsDir.data, today, moreOpen, compact, derived, affiliateOf]);
+    return { sections: buildSections(todayGames, favIds, pinnedIds, followed, nextCards, lookQ.data ?? [], today, moreOpen, compact ? 2 : 1, derived, affiliateOf), teams, nextCards };
+  }, [data, todayGames, favIds, pinnedIds, followed, idle, nextQ.data, lookQ.data, teamsDir.data, today, moreOpen, compact, derived, affiliateOf]);
 
   // Game detail for the handful of followed games in play, so a card can gray a followed player who
   // sat. Only games with a followed PLAYER on them are asked; an affiliate-only card has nobody to
@@ -303,7 +306,17 @@ export default function HomeScreen() {
                 {/* No metallic frame here: Favorites is already its own section, so the frame said nothing
                     the header didn't. It lives on the Scores tab, where a favorite sits among its league. */}
                 {/* A gold star marks a STARRED team's game, in Favorites and anywhere else it lands. */}
-                {item.map((g) => <GameCard key={g.id} game={g} teams={teams} compact={compact} starred={isFavGame(g, favIds)} reason={reasonById.get(g.id)} />)}
+                {item.map((g) => {
+                  const starred = isFavGame(g, favIds);
+                  return (
+                    <GameCard
+                      key={g.id} game={g} teams={teams} compact={compact} starred={starred} reason={reasonById.get(g.id)}
+                      followed={!starred && reasonItemsFor(g).some((i) => i.player)}
+                      pinned={pinnedIds.has(g.id)}
+                      onTogglePin={!starred && todayIds.has(g.id) ? () => togglePin(g.id, today) : undefined}
+                    />
+                  );
+                })}
                 {compact && item.length === 1 ? <View style={{ flex: 1 }} /> : null}
               </View>
             )
@@ -346,6 +359,7 @@ function SectionHeader({ title, subtitle, live, action, collapsible, collapsed, 
 function buildSections(
   games: ScoreGame[],
   favIds: ReadonlySet<string>,
+  pinnedIds: ReadonlySet<string>,
   followed: readonly string[],
   nextCards: ScoreGame[],
   slates: LookaheadSlate[],
@@ -358,33 +372,44 @@ function buildSections(
   const sections: Section[] = [];
   const followedSet = new Set(followed);
 
-  // Favorites: their live and finished games today first, then everything not yet played — today's
-  // upcoming games AND the next-game cards — in one run, soonest first. The key is date-aware: a game
-  // that knows only its day sorts on that day, at its end, instead of before today on an empty time.
-  // Explicit favorites' games first, then the ones here only for a followed player.
-  const explicit = games.filter((g) => isFavGame(g, favIds)).sort(byStatus);
-  const viaPlayer = games.filter((g) => !isFavGame(g, favIds) && followReasonItems(g, derived, affiliateOf).length > 0).sort(byStatus);
-  const mine = [...explicit, ...viaPlayer];
+  // Favorites, in tiers, as on the web (omni-hockey lib/favorite-order.ts): every live game — a
+  // starred team's, then a pinned one, then a followed player's; then today's starred-team games,
+  // today's pinned games, today's followed-player games (each finals first, then by start time); then
+  // the days ahead. A game both starred and pinned is starred; one pinned and also a followed
+  // player's is pinned — pinning it is asking for it higher.
+  const isStar = (g: ScoreGame) => isFavGame(g, favIds);
+  const tier = (g: ScoreGame) => (isStar(g) ? 0 : pinnedIds.has(g.id) ? 1 : 2);
+  const mine = games.filter((g) => isStar(g) || pinnedIds.has(g.id) || followReasonItems(g, derived, affiliateOf).length > 0);
   const shown = new Set(mine.map((g) => g.id));
-  const played = mine.filter((g) => g.status !== 'UPCOMING');
+  // Date-aware: a game that knows only its day sorts at that day's end, not before today.
   const whenKey = (g: ScoreGame) => g.startTimeUTC ?? (g.gameDate ? `${g.gameDate}T99` : '9999');
-  // A next-game card for a later day is `future`; one dated today is a game the slate did not carry
-  // (a seeded schedule with no scores feed) and belongs with today's.
-  const upcoming = [
-    ...mine.filter((g) => g.status === 'UPCOMING').map((g) => ({ g, future: false })),
-    ...nextCards.map((g) => ({ g, future: (g.gameDate ?? '') > today })),
-  ].sort((a, b) => whenKey(a.g).localeCompare(whenKey(b.g)));
-  // Today's games always; the days ahead fold behind "Show more". So the block is never bare (an
-  // offseason morning has nothing today), the nearest future cards fill in up to a floor — and the
-  // folded grid fills its last row rather than leaving a hole beside an odd card.
-  const todayCount = played.length + upcoming.filter((u) => !u.future).length;
-  const alwaysShown = Math.max(todayCount, FAV_MIN_CARDS);
-  const foldedCount = Math.max(0, alwaysShown - played.length);
-  const rowFill = (perRow - ((played.length + foldedCount) % perRow)) % perRow;
-  const shownUpcoming = moreOpen ? upcoming : upcoming.slice(0, foldedCount + rowFill);
-  const favData = [...played, ...shownUpcoming.map((u) => u.g)];
+  const byWhen = (a: ScoreGame, b: ScoreGame) => whenKey(a).localeCompare(whenKey(b));
+  const finalsFirst = (a: ScoreGame, b: ScoreGame) => (a.status === 'FINAL' ? 0 : 1) - (b.status === 'FINAL' ? 0 : 1) || byWhen(a, b);
+  // A next-game card dated today is a game the slate did not carry (a seeded schedule with no scores
+  // feed): it joins its own tier. Later ones are the days ahead.
+  const todayNext = nextCards.filter((g) => (g.gameDate ?? '') <= today);
+  const laterNext = nextCards.filter((g) => (g.gameDate ?? '') > today).sort(byWhen);
+  const liveMine = mine.filter((g) => g.status === 'LIVE').sort((a, b) => tier(a) - tier(b) || byWhen(a, b));
+  const tierToday = (k: number) => [
+    ...mine.filter((g) => g.status !== 'LIVE' && tier(g) === k),
+    ...todayNext.filter((g) => (k === 0 ? isStar(g) : k === 2 ? !isStar(g) : false)),
+  ].sort(finalsFirst);
+
+  // Folded, the block shows today: every live, starred-team and pinned game however many there are,
+  // then today's followed-player games up to six cards in all. The rest of today and the days ahead
+  // wait behind "Show more". An offseason morning still shows the nearest next games, up to a floor,
+  // and a part-filled last row of the grid takes the next card rather than leaving a hole.
+  const always = [...liveMine, ...tierToday(0), ...tierToday(1)];
+  const restOfToday = tierToday(2);
+  const foldable = [...restOfToday, ...laterNext];
+  const todayShown = Math.max(always.length, Math.min(always.length + restOfToday.length, FAV_TODAY_ROWS * perRow));
+  const target = Math.max(todayShown, FAV_MIN_ROWS * perRow);
+  const rowFill = (perRow - (target % perRow)) % perRow;
+  const foldedTake = target - always.length + rowFill;
+  const shownFolded = moreOpen ? foldable : foldable.slice(0, foldedTake);
+  const favData = [...always, ...shownFolded];
   if (favData.length) {
-    sections.push({ title: 'Favorites', featured: true, data: favData, hidden: upcoming.length - shownUpcoming.length, folded: upcoming.length > foldedCount + rowFill });
+    sections.push({ title: 'Favorites', featured: true, data: favData, hidden: foldable.length - shownFolded.length, folded: foldable.length > foldedTake });
   }
 
   // Live games from followed leagues, not already shown above.

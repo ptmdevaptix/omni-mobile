@@ -13,10 +13,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { leagueOf } from './api';
+import { dayKey } from './format';
 
 const KEY_TEAMS = 'favoriteTeams';
 const KEY_PLAYERS = 'favoritePlayers';
 const KEY_PROSPECTS = 'prospectFollows';
+const KEY_PINS = 'pinnedGames';
 
 export type FavoriteTeam = {
   id: string;
@@ -33,8 +35,15 @@ export type FavoriteTeam = {
  */
 export type ProspectFollow = { team: string; affiliates: string[] };
 
-type Store = { teams: FavoriteTeam[]; players: string[]; follows: ProspectFollow[] };
-const EMPTY: Store = { teams: [], players: [], follows: [] };
+/**
+ * One game pinned among the Favorites for its day, without favoriting either team — the web's pin
+ * (omni-hockey lib/user-preferences.ts). `date` is the day it was pinned for, the slate date the app
+ * loaded it on; the pin lapses once that day is over, dropped as it is read.
+ */
+export type PinnedGame = { id: string; date: string };
+
+type Store = { teams: FavoriteTeam[]; players: string[]; follows: ProspectFollow[]; pins: PinnedGame[] };
+const EMPTY: Store = { teams: [], players: [], follows: [], pins: [] };
 
 type Ctx = {
   /** Storage has been read; before this, everything is empty and nothing should be written or sent. */
@@ -61,6 +70,13 @@ type Ctx = {
   unfollowProspects: (team: string) => void;
   /** Keep a follow's affiliates current with the org's (affiliation changes, healed gaps). */
   syncProspectAffiliates: (team: string, live: Omit<FavoriteTeam, 'via'>[]) => void;
+  /** Games pinned for today (lapsed ones already dropped). */
+  pinnedGames: PinnedGame[];
+  isPinned: (gameId: string) => boolean;
+  /** Pin a game for `date` (today's slate date), or unpin it. */
+  togglePin: (gameId: string, date: string) => void;
+  /** Replace every slice at once — what another device's preferences arrive as (lib/sync). */
+  replaceAll: (next: { teams: FavoriteTeam[]; players: string[]; follows: ProspectFollow[]; pins?: PinnedGame[] }) => void;
 };
 
 const noop = () => {};
@@ -69,6 +85,7 @@ const FavoritesContext = createContext<Ctx>({
   favorites: [], favoriteTeams: [], isFavorite: () => false, toggle: noop, addFavoriteTeam: noop, removeFavoriteTeam: noop, moveFavorite: noop,
   favoritePlayers: [], isFavoritePlayer: () => false, togglePlayer: noop, renamePlayer: noop,
   prospectFollows: [], isFollowingProspects: () => false, followProspects: noop, unfollowProspects: noop, syncProspectAffiliates: noop,
+  pinnedGames: [], isPinned: () => false, togglePin: noop, replaceAll: noop,
 });
 
 function parseJson(raw: string | null): unknown {
@@ -99,6 +116,13 @@ function parsePlayers(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string' && !!x) : [];
 }
 
+/** Well-formed pins still in force today. */
+function parsePins(raw: unknown, today: string = dayKey()): PinnedGame[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((p): p is PinnedGame =>
+    !!p && typeof p.id === 'string' && typeof p.date === 'string' && p.date >= today);
+}
+
 function parseFollows(raw: unknown): ProspectFollow[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -114,7 +138,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   const ref = useRef<Store>(EMPTY);
 
   useEffect(() => {
-    AsyncStorage.multiGet([KEY_TEAMS, KEY_PLAYERS, KEY_PROSPECTS])
+    AsyncStorage.multiGet([KEY_TEAMS, KEY_PLAYERS, KEY_PROSPECTS, KEY_PINS])
       .then((pairs) => {
         const byKey = Object.fromEntries(pairs);
         const teams = parseTeams(parseJson(byKey[KEY_TEAMS]));
@@ -122,6 +146,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
           teams,
           players: parsePlayers(parseJson(byKey[KEY_PLAYERS])),
           follows: parseFollows(parseJson(byKey[KEY_PROSPECTS])),
+          pins: parsePins(parseJson(byKey[KEY_PINS])),
         };
         ref.current = next;
         setStore(next);
@@ -143,6 +168,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     if (next.teams !== prev.teams) AsyncStorage.setItem(KEY_TEAMS, JSON.stringify(next.teams)).catch(() => {});
     if (next.players !== prev.players) AsyncStorage.setItem(KEY_PLAYERS, JSON.stringify(next.players)).catch(() => {});
     if (next.follows !== prev.follows) AsyncStorage.setItem(KEY_PROSPECTS, JSON.stringify(next.follows)).catch(() => {});
+    if (next.pins !== prev.pins) AsyncStorage.setItem(KEY_PINS, JSON.stringify(next.pins)).catch(() => {});
   }, []);
 
   const value = useMemo<Ctx>(() => {
@@ -150,6 +176,8 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     const isFavorite = (id: string) => store.teams.some((t) => t.id === id);
     const isFavoritePlayer = (id: string) => store.players.includes(id);
     const isFollowingProspects = (team: string) => store.follows.some((f) => f.team === team.toLowerCase());
+    // Lapsed pins drop out here too, so one pinned last night is gone this morning without a relaunch.
+    const pinnedGames = parsePins(store.pins);
 
     // Switch off, as its own step so removing the NHL club can call it too.
     const unfollow = (s: Store, team: string): Store => {
@@ -232,6 +260,20 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         if (teams === s.teams && follows === s.follows) return s;
         return { ...s, teams, follows };
       }),
+      pinnedGames,
+      isPinned: (gameId) => pinnedGames.some((p) => p.id === gameId),
+      togglePin: (gameId, date) => update((s) => {
+        const live = parsePins(s.pins);
+        const pins = live.some((p) => p.id === gameId) ? live.filter((p) => p.id !== gameId) : [...live, { id: gameId, date }];
+        return { ...s, pins };
+      }),
+      // Pins are optional: a server that cannot hold them yet sends none, and this device keeps its own.
+      replaceAll: (next) => update((s) => ({
+        teams: parseTeams(next.teams),
+        players: parsePlayers(next.players),
+        follows: parseFollows(next.follows),
+        pins: next.pins ? parsePins(next.pins) : s.pins,
+      })),
     };
   }, [store, loaded, update]);
 

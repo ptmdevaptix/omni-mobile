@@ -36,6 +36,12 @@ export type NotificationPrefs = {
    */
   playerAlerts: Record<string, Partial<PersonAlerts>>;
   prospectAlerts: Record<string, Partial<PersonAlerts>>;
+  /** Alerts for games pinned for the day. On by default: pinning a game is asking to hear about it. */
+  pinnedAlerts: boolean;
+  /** Alerts for followed prospects, all orgs at once — one switch, as the Settings screen shows it. */
+  prospectsEnabled: boolean;
+  /** Starred players silenced individually. Players are ON by default, so absence means enabled. */
+  mutedPlayers: string[];
 };
 
 export const DEFAULT_PREFS: NotificationPrefs = {
@@ -44,6 +50,9 @@ export const DEFAULT_PREFS: NotificationPrefs = {
   mutedTeams: [],
   playerAlerts: {},
   prospectAlerts: {},
+  pinnedAlerts: true,
+  prospectsEnabled: true,
+  mutedPlayers: [],
 };
 
 function normalise(raw: unknown): NotificationPrefs {
@@ -55,6 +64,9 @@ function normalise(raw: unknown): NotificationPrefs {
     mutedTeams: Array.isArray(p.mutedTeams) ? p.mutedTeams.filter((x) => typeof x === 'string') : [],
     playerAlerts: (p.playerAlerts ?? {}) as Record<string, Partial<PersonAlerts>>,
     prospectAlerts: (p.prospectAlerts ?? {}) as Record<string, Partial<PersonAlerts>>,
+    pinnedAlerts: typeof p.pinnedAlerts === 'boolean' ? p.pinnedAlerts : DEFAULT_PREFS.pinnedAlerts,
+    prospectsEnabled: typeof p.prospectsEnabled === 'boolean' ? p.prospectsEnabled : DEFAULT_PREFS.prospectsEnabled,
+    mutedPlayers: Array.isArray(p.mutedPlayers) ? p.mutedPlayers.filter((x) => typeof x === 'string') : [],
   };
 }
 
@@ -68,6 +80,10 @@ const Ctx = createContext<{
   /** The switches for one followed person, with their defaults filled in. */
   alertsFor: (id: string, kind: 'starred' | 'prospect') => PersonAlerts;
   setAlert: (id: string, kind: 'starred' | 'prospect', event: PersonEvent, on: boolean) => void;
+  setPinnedAlerts: (on: boolean) => void;
+  setProspectsEnabled: (on: boolean) => void;
+  setPlayerEnabled: (playerId: string, on: boolean) => void;
+  isPlayerEnabled: (playerId: string) => boolean;
 }>({
   prefs: DEFAULT_PREFS,
   ready: false,
@@ -77,6 +93,10 @@ const Ctx = createContext<{
   isTeamEnabled: () => true,
   alertsFor: (_id, kind) => resolveAlerts(undefined, kind),
   setAlert: () => {},
+  setPinnedAlerts: () => {},
+  setProspectsEnabled: () => {},
+  setPlayerEnabled: () => {},
+  isPlayerEnabled: () => true,
 });
 
 export function NotificationPrefsProvider({ children }: { children: ReactNode }) {
@@ -123,6 +143,16 @@ export function NotificationPrefsProvider({ children }: { children: ReactNode })
         if (Object.keys(diff).length) map[id] = diff; else delete map[id];
         return { ...p, [field]: map };
       }),
+    // These three silence a follow by leaving it out of the registration (lib/push usePushSync), so
+    // the server needs to know nothing about them — and the end-of-day summary leaves them out too.
+    setPinnedAlerts: (on: boolean) => update((p) => ({ ...p, pinnedAlerts: on })),
+    setProspectsEnabled: (on: boolean) => update((p) => ({ ...p, prospectsEnabled: on })),
+    setPlayerEnabled: (playerId: string, on: boolean) =>
+      update((p) => ({
+        ...p,
+        mutedPlayers: on ? p.mutedPlayers.filter((id) => id !== playerId) : [...new Set([...p.mutedPlayers, playerId])],
+      })),
+    isPlayerEnabled: (playerId: string) => !prefs.mutedPlayers.includes(playerId),
   }), [prefs, ready]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -7,6 +7,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { CompactModeProvider } from '@/lib/compact';
 import { FavoritesProvider } from '@/lib/favorites';
+import { SyncProvider } from '@/lib/sync';
 import { FollowedLeaguesProvider } from '@/lib/followed-leagues';
 import { NoticesPrefProvider } from '@/lib/notices-pref';
 import { NotificationPrefsProvider } from '@/lib/notification-prefs';
@@ -65,9 +66,12 @@ export default function RootLayout() {
           <FavoritesProvider>
             <FollowedLeaguesProvider>
               <NotificationPrefsProvider>
-                <NoticesPrefProvider>
-                  <RootNav />
-                </NoticesPrefProvider>
+                {/* Inside favorites and leagues, which it reads and writes: pairing with the web. */}
+                <SyncProvider>
+                  <NoticesPrefProvider>
+                    <RootNav />
+                  </NoticesPrefProvider>
+                </SyncProvider>
                 {/* Renders nothing: it counts how many people follow each team, player and league,
                     gated on the same regional answer that gates analytics on the web. */}
                 <PreferenceTelemetry />

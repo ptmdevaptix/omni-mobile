@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { SymbolView } from 'expo-symbols';
 import { useRouter } from 'expo-router';
 import { memo, useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -26,16 +27,27 @@ const PEWTER = ['#f0f2f4', '#a7abb0', '#5f6368', '#c8ccd0'] as const; // light m
 type Result = 'win' | 'loss' | 'tie' | undefined;
 /** Why a game is among the favorites — the followed players (grayed when one sat) or the affiliate. */
 export type FollowReason = { items: { label: string; muted: boolean }[] };
-type GameCardProps = { game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string; compact?: boolean; starred?: boolean; reason?: FollowReason };
+type GameCardProps = {
+  game: ScoreGame; teams: Record<string, ScoreTeam>; featured?: boolean; cardColor?: string; compact?: boolean; starred?: boolean; reason?: FollowReason;
+  /** Here for a followed player or prospect — the corner shows the person mark. */
+  followed?: boolean;
+  pinned?: boolean;
+  /** Given for a game that can be pinned (today's, not a starred team's): the corner mark toggles it. */
+  onTogglePin?: () => void;
+};
+
+// The pin's blue, the web's primary. Not the theme accent: that is gold in dark mode, where a pinned
+// game would read as a starred one.
+const PIN_BLUE = { light: '#2563eb', dark: '#60a5fa' } as const;
 
 // Shared score card. The app's own look — the league badge row on top with the status at the right,
-// no accent bar — deliberately not the web's; what it shares with the web is the CONTENT: a gold star
-// for a starred team's game, the network beside the time (linked when the API knows the broadcaster's
+// no accent bar — deliberately not the web's; what it shares with the web is the CONTENT: the corner
+// mark (star, pin or person) saying why a game is yours, the network beside the time (linked when the API knows the broadcaster's
 // page), and how far off a future game is, in squares. Tapping the card opens the game; tapping a
 // team's logo/name opens that team.
 // `featured` wraps it in a metallic border (a favorite among its league on the Scores tab).
 // `compact` renders a tighter, abbreviation-based card so two fit side by side (grid mode).
-function GameCardBase({ game, teams, featured = false, cardColor, compact = false, starred = false, reason }: GameCardProps) {
+function GameCardBase({ game, teams, featured = false, cardColor, compact = false, starred = false, reason, followed = false, pinned = false, onTogglePin }: GameCardProps) {
   const t = useTheme();
   const router = useRouter();
   const away = teams[game.awayTeamId] ?? {};
@@ -70,10 +82,8 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
       ? openGame()
       : router.push({ pathname: '/teams/[teamId]', params: { teamId: canonicalTeamId(id) } });
 
-  // The status, led by the gold "yours" star for a starred team's game.
   const status = (size: number) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
-      {starred ? <Text style={{ color: '#f5a623', fontSize: size }} accessibilityLabel="Favorite team">★</Text> : null}
       <Text style={{ color: live ? t.live : t.sub, fontSize: size, fontWeight: live ? '700' : compact ? '500' : '400', flexShrink: 1 }} numberOfLines={1}>
         {[dateLabel || null, game.statusLabel].filter(Boolean).join(' · ')}
       </Text>
@@ -93,6 +103,31 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
   const squares = game.status === 'UPCOMING' ? <DaysOutSquares utc={game.startTimeUTC} day={game.gameDate} /> : null;
   // Who put this game here: "Lechner (COL)", "NYI AFFILIATE" — cycling when there are several.
   const why = reason?.items.length ? <Reason items={reason.items} size={compact ? 10 : 11} /> : null;
+  // The lower-right corner says why the game is yours, as on the web: the gold star for a starred
+  // team, the solid pin for a pinned game, the person mark for a followed player's. On any other game
+  // today it is a faint pin. A phone cannot hover, so the mark itself is the control: tapping the
+  // person or the faint pin pins the game, tapping the solid pin unpins it.
+  const iconSize = compact ? 12 : 13;
+  const pinTint = PIN_BLUE[t.mode];
+  const corner = starred ? (
+    <Text style={{ color: '#f5a623', fontSize: iconSize }} accessibilityLabel="Favorite team">★</Text>
+  ) : onTogglePin ? (
+    <Pressable
+      onPress={onTogglePin}
+      hitSlop={12}
+      accessibilityRole="button"
+      accessibilityState={{ selected: pinned }}
+      accessibilityLabel={pinned ? 'Unpin this game' : 'Pin this game to Favorites for today'}
+    >
+      <SymbolView
+        name={pinned ? 'pin.fill' : followed ? 'person.fill' : 'pin'}
+        size={iconSize}
+        tintColor={pinned ? pinTint : followed ? t.accent : t.subtle}
+      />
+    </Pressable>
+  ) : followed ? (
+    <SymbolView name="person.fill" size={iconSize} tintColor={t.accent} accessibilityLabel="Followed player" />
+  ) : null;
 
   const content = compact ? (
     <>
@@ -101,6 +136,9 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
         {status(10)}
         <View style={{ flex: 1 }} />
         {squares}
+        {/* The corner mark rides the top row here: a row of its own under every card would cost
+            compact mode the height it exists to save. */}
+        {corner}
       </View>
       <TeamLine nhl={nhl} compact team={away} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
       <TeamLine nhl={nhl} compact team={home} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
@@ -127,12 +165,13 @@ function GameCardBase({ game, teams, featured = false, cardColor, compact = fals
       </View>
       <TeamLine nhl={nhl} team={away} score={game.awayScore} showScore={done} result={awayResult} onPress={() => openTeam(game.awayTeamId, away)} />
       <TeamLine nhl={nhl} team={home} score={game.homeScore} showScore={done} result={homeResult} onPress={() => openTeam(game.homeTeamId, home)} />
-      {network || squares || why ? (
+      {network || squares || why || corner ? (
         <View style={styles.footer}>
           {why ?? network}
           <View style={{ flex: 1 }} />
           {why && network ? network : null}
           {squares}
+          {corner}
         </View>
       ) : null}
     </>
@@ -166,7 +205,6 @@ function Reason({ items, size }: { items: { label: string; muted: boolean }[]; s
   const shown = items.length <= 2 ? items : [items[i % items.length]];
   return (
     <Text style={{ fontSize: size, flexShrink: 1 }} numberOfLines={1}>
-      <Text style={{ color: '#f5a623' }}>★ </Text>
       {/* The accent colour, as the web gives it: this line is why the card is here at all, and in
           plain grey it read as one more caption. A player who did not dress stays muted. */}
       {shown.map((it, k) => (
@@ -209,6 +247,9 @@ const teamEq = (x?: ScoreTeam, y?: ScoreTeam) =>
 function areEqual(a: GameCardProps, b: GameCardProps): boolean {
   const g1 = a.game, g2 = b.game;
   if (a.featured !== b.featured || a.cardColor !== b.cardColor || a.compact !== b.compact || a.starred !== b.starred) return false;
+  // onTogglePin is compared by presence, not identity: callers build it inline each render, and it
+  // only ever pins this card's own game.
+  if (a.followed !== b.followed || a.pinned !== b.pinned || !!a.onTogglePin !== !!b.onTogglePin) return false;
   if (JSON.stringify(a.reason?.items ?? null) !== JSON.stringify(b.reason?.items ?? null)) return false;
   if (g1.id !== g2.id || g1.status !== g2.status || g1.statusLabel !== g2.statusLabel
     || g1.awayScore !== g2.awayScore || g1.homeScore !== g2.homeScore || g1.network !== g2.network || g1.networkUrl !== g2.networkUrl) return false;

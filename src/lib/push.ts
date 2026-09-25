@@ -85,6 +85,7 @@ export async function postRegistration(
   teams: string[],
   players: string[] = [],
   prospectOrgs: string[] = [],
+  pinnedGames: { id: string; date: string }[] = [],
 ): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/push/register`, {
@@ -103,6 +104,8 @@ export async function postRegistration(
         // Exceptions only; the server fills in each follow's default for the rest.
         playerAlerts: prefs.playerAlerts,
         prospectAlerts: prefs.prospectAlerts,
+        // Games pinned for today, alerted like a favorite team's under the same event switches.
+        pinnedGames,
       }),
     });
     return res.ok;
@@ -187,15 +190,20 @@ export function useNotificationTaps() {
  */
 export function usePushSync() {
   const { prefs, ready } = useNotificationPrefs();
-  const { favorites, favoritePlayers, prospectFollows, loaded } = useFavorites();
+  const { favorites, favoritePlayers, prospectFollows, pinnedGames, loaded } = useFavorites();
   const tokenRef = useRef<string | null>(null);
   const lastSent = useRef<string>('');
 
-  const orgs = prospectFollows.map((f) => f.team);
+  // A follow switched off in Settings is simply not sent: a muted player, the prospects as a whole,
+  // the pinned games. The server then has nothing to alert about for it — and the end-of-day
+  // summary, which reads the same lists, leaves it out as well.
+  const players = favoritePlayers.filter((id) => !prefs.mutedPlayers.includes(id));
+  const orgs = prefs.prospectsEnabled ? prospectFollows.map((f) => f.team) : [];
+  const pins = prefs.pinnedAlerts ? pinnedGames : [];
   // Every subscription is in the signature, or following a player would never reach the server.
   const signature = JSON.stringify({
-    e: prefs.enabled, v: prefs.events, m: prefs.mutedTeams, t: favorites, p: favoritePlayers, o: orgs,
-    pa: prefs.playerAlerts, oa: prefs.prospectAlerts,
+    e: prefs.enabled, v: prefs.events, m: prefs.mutedTeams, t: favorites, p: players, o: orgs,
+    pa: prefs.playerAlerts, oa: prefs.prospectAlerts, g: pins,
   });
 
   useEffect(() => {
@@ -211,7 +219,7 @@ export function usePushSync() {
         token = result.token;
         tokenRef.current = token;
       }
-      if (await postRegistration(token, prefs, favorites, favoritePlayers, orgs)) lastSent.current = signature;
+      if (await postRegistration(token, prefs, favorites, players, orgs, pins)) lastSent.current = signature;
     }, 800);
 
     return () => clearTimeout(timer);

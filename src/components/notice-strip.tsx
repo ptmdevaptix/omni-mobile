@@ -27,6 +27,8 @@ const PRIORITY: Record<Notice['kind'], number> = { breaking: 0, season: 1, featu
 const ROTATE_MS = 8000;
 /** The last day the new-leagues notice runs — after that the leagues are simply part of the app. */
 const NEW_LEAGUES_UNTIL = '2026-11-30';
+/** The last day the pinned-games notice runs — the web's runs as long. */
+const PINS_UNTIL = '2026-10-31';
 const NHL_LOGO = 'https://omnihockey.com/nhl-logo.svg';
 
 export function NoticeStrip() {
@@ -51,6 +53,11 @@ export function NoticeStrip() {
     if (today <= NEW_LEAGUES_UNTIL) {
       out.push({ id: 'feature-new-leagues', kind: 'feature', tag: 'New', route: '/following',
         text: 'Euro leagues and Canadian Jr. A now supported — follow the SHL, Liiga, Extraliga, BCHL, AJHL, SJHL, MJHL, OJHL and CCHL' });
+    }
+    // Ahead of the always-on prospects notice, which yields while the strip's three places are full.
+    if (today <= PINS_UNTIL) {
+      out.push({ id: 'feature-pinned-games', kind: 'feature', tag: 'New', route: '/scores',
+        text: "Pin any of today's games to your Favorites — tap the pin in a score card's corner" });
     }
     out.push({ id: 'feature-prospect-follows', kind: 'feature', route: '/following?guide=prospects',
       text: "Follow your favorite team's prospects — their games and lineups, wherever they play" });

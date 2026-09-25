@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, View } from 'react-native';
 
+import { SyncButton } from '@/components/sync-sheet';
 import { useCompact } from '@/lib/compact';
 import { useNoticesPref } from '@/lib/notices-pref';
 import { useTheme, useThemeMode } from '@/lib/theme';
@@ -14,7 +15,10 @@ export function HeaderActions() {
   const { compact, setCompact } = useCompact();
   const notices = useNoticesPref();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, paddingRight: 4 }}>
+    // gap 16 rather than 18: the Sync button made five, and the title needs the room.
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingRight: 4 }}>
+      {/* Sync across devices — first, and in colour, so pairing with the web can be found at all. */}
+      <SyncButton />
       <Pressable onPress={() => router.push('/search')} hitSlop={10} accessibilityLabel="Search">
         <SymbolView name="magnifyingglass" tintColor={t.text} size={20} />
       </Pressable>

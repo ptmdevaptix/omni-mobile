@@ -104,7 +104,7 @@ async function analyticsAllowed(): Promise<boolean> {
 }
 
 /** "connor-mcdavid-8478402" → "Connor Mcdavid", for a star whose club we have not resolved yet. */
-function nameFromSlug(slug: string): string {
+export function nameFromSlug(slug: string): string {
   return slug
     .replace(/-\d+$/, '')
     .replace(/-[0-9a-f]{8}-[0-9a-f-]+$/i, '')
@@ -115,7 +115,7 @@ function nameFromSlug(slug: string): string {
 }
 
 export function PreferenceTelemetry() {
-  const { favoriteTeams, favorites, prospectFollows, loaded } = useFavorites();
+  const { favoriteTeams, favoritePlayers, prospectFollows, loaded } = useFavorites();
   const { followed, customized, loaded: leaguesLoaded } = useFollowedLeagues();
   // Already fetched for the follows features and cached for hours, so the names cost nothing extra.
   const { clubs } = useDerivedClubs();
@@ -128,7 +128,9 @@ export function PreferenceTelemetry() {
   const named = clubs.flatMap((c) => c.players);
   const prefs = {
     teams: favoriteTeams.map((t) => ({ id: t.id, league: t.league, ...(t.via ? { via: t.via } : {}) })),
-    players: favorites.map((id) => ({
+    // The starred PLAYERS. This read `favorites` — the team ids — so every device reported its
+    // teams a second time as players, named from their slugs, and no starred player at all.
+    players: favoritePlayers.map((id) => ({
       id,
       name: named.find((p) => p.starIds.includes(id))?.name || nameFromSlug(id),
     })),

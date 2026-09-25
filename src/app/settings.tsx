@@ -9,6 +9,7 @@ import { ProspectFollowToggle } from '@/components/prospect-follow-toggle';
 import { useFavorites } from '@/lib/favorites';
 import { fetchAllTeams, type TeamDirectoryEntry } from '@/lib/leagues';
 import { NOTIFICATION_EVENTS, useNotificationPrefs } from '@/lib/notification-prefs';
+import { fetchPlayer } from '@/lib/player';
 import { isSharingPrefs, setSharingPrefs } from '@/lib/pref-telemetry';
 import { acquirePushToken, pushPermissionStatus, type PushPermission } from '@/lib/push';
 import { useTheme } from '@/lib/theme';
@@ -17,8 +18,11 @@ type Row = { id: string; name: string; logo?: string; darkLogo?: string; league:
 
 export default function SettingsScreen() {
   const t = useTheme();
-  const { favorites, favoriteTeams, moveFavorite, toggle } = useFavorites();
-  const { prefs, setEnabled, setEvent, setTeamEnabled, isTeamEnabled } = useNotificationPrefs();
+  const { favorites, favoriteTeams, moveFavorite, toggle, favoritePlayers, prospectFollows } = useFavorites();
+  const {
+    prefs, setEnabled, setEvent, setTeamEnabled, isTeamEnabled,
+    setPinnedAlerts, setProspectsEnabled, setPlayerEnabled, isPlayerEnabled,
+  } = useNotificationPrefs();
   const q = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
 
   // On by default, so it is read rather than assumed — a device that has declined must not show the
@@ -75,7 +79,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
           <ToggleRow
             label="Game notifications"
-            detail="For your favorite teams"
+            detail="For your teams, followed players and pinned games"
             value={prefs.enabled}
             onChange={enable}
           />
@@ -109,6 +113,47 @@ export default function SettingsScreen() {
             />
           ))}
         </View>
+
+        {/* Beyond your teams. Each switch here works by leaving that follow out of what this device
+            tells the server, so an alert switched off here also leaves the end-of-day summary. */}
+        <Text style={[styles.header, { color: t.sub, marginTop: 8 }]}>ALSO NOTIFY ME ABOUT</Text>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, opacity: off ? 0.4 : 1 }]}>
+          <ToggleRow
+            label="Pinned games"
+            detail="Games you pin for the day, with the alerts chosen above"
+            value={prefs.pinnedAlerts}
+            disabled={off}
+            onChange={setPinnedAlerts}
+          />
+          {prospectFollows.length ? (
+            <ToggleRow
+              label="Followed prospects"
+              detail={`Goals, assists and finals for ${prospectFollows.map((f) => f.team.toUpperCase()).join(', ')} prospects`}
+              value={prefs.prospectsEnabled}
+              disabled={off}
+              divider
+              onChange={setProspectsEnabled}
+            />
+          ) : null}
+        </View>
+
+        {favoritePlayers.length ? (
+          <>
+            <Text style={[styles.header, { color: t.sub, marginTop: 8 }]}>FOLLOWED PLAYERS</Text>
+            <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, opacity: off ? 0.4 : 1 }]}>
+              {favoritePlayers.map((id, i) => (
+                <PlayerAlertRow
+                  key={id}
+                  id={id}
+                  value={isPlayerEnabled(id)}
+                  disabled={off}
+                  divider={i > 0}
+                  onChange={(on) => setPlayerEnabled(id, on)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
       </View>
 
       {/* ── Favorite teams: order + per-team mute ─────────────────────── */}
@@ -203,6 +248,16 @@ export default function SettingsScreen() {
       </View>
     </ScrollView>
   );
+}
+
+/** One starred player's alert switch, named from the same cached lookup the Favorites screen uses. */
+function PlayerAlertRow({ id, value, disabled, divider, onChange }: {
+  id: string; value: boolean; disabled: boolean; divider: boolean; onChange: (on: boolean) => void;
+}) {
+  const q = useQuery({ queryKey: ['player', id], queryFn: () => fetchPlayer(id) });
+  const p = q.data;
+  const detail = p ? [p.position, p.teamAbbrev].filter(Boolean).join(' · ') : undefined;
+  return <ToggleRow label={p?.fullName ?? '…'} detail={detail || undefined} value={value} disabled={disabled} divider={divider} onChange={onChange} />;
 }
 
 function ToggleRow({
