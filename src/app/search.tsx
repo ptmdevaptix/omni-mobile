@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { StateView } from '@/components/state-view';
 import { TeamLogo } from '@/components/team-logo';
@@ -11,6 +11,7 @@ import { fetchAllTeams, leagueRank, type TeamDirectoryEntry } from '@/lib/league
 import { searchPlayers } from '@/lib/player';
 import { teamMatches } from '@/lib/team-search-terms';
 import type { PlayerSearchResult } from '@/lib/player-types';
+import { foldAccents } from '@/lib/team-name';
 import { useTheme } from '@/lib/theme';
 
 /**
@@ -35,12 +36,34 @@ export default function SearchScreen() {
   const [activeOnly, setActiveOnly] = useState(true);
   const s = q.trim();
 
+  // Players are asked for 200ms after the last keystroke, not on every one. Every letter used to
+  // fire its own request — "mcdavid" was six searches in flight at once, each a second or more — and
+  // the answers could land out of order. Teams filter locally, so they follow the text as typed.
+  const [sq, setSq] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setSq(s), 200);
+    return () => clearTimeout(id);
+  }, [s]);
+
   const teamsQ = useQuery({ queryKey: ['all-teams'], queryFn: fetchAllTeams, staleTime: 60 * 60_000 });
   const playersQ = useQuery({
-    queryKey: ['player-search', s.toLowerCase(), activeOnly],
-    queryFn: () => searchPlayers(s, activeOnly),
-    enabled: s.length >= 2,
+    queryKey: ['player-search', sq.toLowerCase(), activeOnly],
+    queryFn: () => searchPlayers(sq, activeOnly),
+    enabled: sq.length >= 2,
+    staleTime: 5 * 60_000,
+    // While a longer query is on its way, the last answer narrowed to it — every player the longer
+    // query can match is among the shorter one's, so this is a subset, never a guess — instead of
+    // an empty list for the second the search takes.
+    placeholderData: (prev, prevQuery) => {
+      const prevKey = String(prevQuery?.queryKey?.[1] ?? '');
+      const now = sq.toLowerCase();
+      if (!prev || !prevKey || !now.startsWith(prevKey)) return undefined;
+      const words = foldAccents(now).split(/\s+/).filter(Boolean);
+      return prev.filter((p) => words.every((w) => foldAccents(p.name.toLowerCase()).includes(w)));
+    },
   });
+  // Still working on the text as typed: the debounce has not caught up, or the request is out.
+  const searching = s.length >= 2 && (sq !== s || playersQ.isFetching);
 
   // A club is found by everything it could reasonably be typed as — its id, its name with the
   // abbreviations in it spelled out ("penn state", "western michigan"), and a short alias list for
@@ -68,7 +91,7 @@ export default function SearchScreen() {
     ...(players.length ? [{ title: 'Players', data: players.map((player): Hit => ({ kind: 'player', player })) }] : []),
   ];
 
-  const noResults = s.length > 0 && !teams.length && !players.length && !playersQ.isFetching;
+  const noResults = s.length > 0 && !teams.length && !players.length && !searching;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -129,6 +152,14 @@ export default function SearchScreen() {
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => <Text style={[styles.header, { color: t.sub }]}>{section.title.toUpperCase()}</Text>}
           renderItem={({ item }) => (item.kind === 'team' ? <TeamResult team={item.team} /> : <PlayerResult player={item.player} />)}
+          // Said out loud while players are still coming, so a list of teams — or none — is not read
+          // as the whole answer.
+          ListFooterComponent={searching ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 4 }}>
+              <ActivityIndicator size="small" />
+              <Text style={{ color: t.sub, fontSize: 13 }}>Searching players…</Text>
+            </View>
+          ) : null}
         />
       )}
     </View>
