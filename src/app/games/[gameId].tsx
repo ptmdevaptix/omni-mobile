@@ -289,6 +289,35 @@ function Upcoming({ g }: { g: GameDetail }) {
 }
 
 /**
+ * Whether the attempts so far settle the shootout, whatever the feed's status says.
+ *
+ * The first three rounds are a best-of-three: it is over as soon as one side leads by more than the
+ * other has shots left. After that each round is sudden death, over when a round ends uneven. Three
+ * rounds is the HockeyTech leagues' format (the AHL, the CHL, the USHL, junior A); a league that
+ * shoots five would only ever be called over late, never early, so it errs the safe way.
+ */
+function shootoutDecided(attempts: Shootout['attempts'], regulation = 3): boolean {
+  const n = attempts.length;
+  if (!n) return false;
+  const first = attempts[0].teamAbbr;
+  const goals = (mine: boolean) => attempts.filter((a) => a.scored && (a.teamAbbr === first) === mine).length;
+  const a = goals(true), b = goals(false);
+  const shotsA = Math.ceil(n / 2), shotsB = Math.floor(n / 2);
+  if (n <= 2 * regulation) {
+    const leftA = regulation - shotsA, leftB = regulation - shotsB;
+    return a > b + leftB || b > a + leftA;
+  }
+  return n % 2 === 0 && a !== b;
+}
+
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st. */
+function ordinal(n: number): string {
+  const tens = n % 100, ones = n % 10;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ones === 1 ? 'st' : ones === 2 ? 'nd' : ones === 3 ? 'rd' : 'th';
+  return `${n}${suffix}`;
+}
+
+/**
  * The shootout: one line with the result, which a tap opens into every attempt — who shot, whether he
  * scored, who stopped him — and closes again. One line because the result is what nearly everyone
  * opened the game for; nine rounds of names would push the penalties and the box score a screen down.
@@ -300,12 +329,23 @@ function ShootoutCard({ g, shootout }: { g: GameDetail; shootout: Shootout }) {
   const { attempts, awayGoals, homeGoals } = shootout;
   const away = g.awayTeam.abbr, home = g.homeTeam.abbr;
   const rounds = attempts.reduce((m, a) => Math.max(m, a.round), 0);
-  const final = g.status === 'FINAL';
+  // Over when the game is final — or, sooner, when the attempts themselves settle it: HockeyTech can
+  // take minutes to finalize after the deciding shot, and "Top 10th" over a shootout already won
+  // would be wrong. See shootoutDecided.
+  const final = g.status === 'FINAL' || shootoutDecided(attempts);
   const winner = awayGoals === homeGoals ? null : awayGoals > homeGoals ? away : home;
   const result = final && winner
     ? `${winner} wins ${Math.max(awayGoals, homeGoals)}–${Math.min(awayGoals, homeGoals)}`
     : `${away} ${awayGoals}–${homeGoals} ${home}`;
-  const tail = rounds ? ` · ${rounds} round${rounds === 1 ? '' : 's'}` : '';
+  // Under way, where it stands in baseball's terms: an odd number of attempts means the second
+  // shooter of that round is up — "Bottom 3rd" — and an even number means the next round's first —
+  // "Top 4th". It says there are shooters still to come, which "3 rounds" did not. Counted from the
+  // attempts themselves, not the feed's round numbers.
+  const n = attempts.length;
+  const inning = n % 2 === 1 ? `Bottom ${ordinal(Math.ceil(n / 2))}` : `Top ${ordinal(n / 2 + 1)}`;
+  const tail = !final ? ` · ${inning}` : rounds ? ` · ${rounds} round${rounds === 1 ? '' : 's'}` : '';
+  // Something to open only once there is an attempt to show.
+  const expandable = attempts.length > 0;
   // The deciding attempt: the feed's own flag where it sets one; otherwise, once the game is over,
   // the winner's goal in the last round — the one the other side could not answer.
   const decided = attempts.some((a) => a.winner)
@@ -316,9 +356,10 @@ function ShootoutCard({ g, shootout }: { g: GameDetail; shootout: Shootout }) {
     <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
       <Pressable
         onPress={() => setOpen((o) => !o)}
+        disabled={!expandable}
         accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={`Shootout, ${result}${tail}. ${open ? 'Hide' : 'Show'} the attempts.`}
+        accessibilityState={{ expanded: open, disabled: !expandable }}
+        accessibilityLabel={`Shootout, ${result}${tail}.${expandable ? ` ${open ? 'Hide' : 'Show'} the attempts.` : ''}`}
         hitSlop={6}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
       >
@@ -326,9 +367,9 @@ function ShootoutCard({ g, shootout }: { g: GameDetail; shootout: Shootout }) {
         <Text style={{ color: t.text, fontSize: 14, fontWeight: '700', flex: 1 }} numberOfLines={1}>
           {result}<Text style={{ color: t.sub, fontWeight: '400' }}>{tail}</Text>
         </Text>
-        {attempts.length ? <Text style={{ color: t.subtle, fontSize: 12 }}>{open ? '▾' : '▸'}</Text> : null}
+        {expandable ? <Text style={{ color: t.subtle, fontSize: 12 }}>{open ? '▾' : '▸'}</Text> : null}
       </Pressable>
-      {open ? (
+      {open && expandable ? (
         attempts.length ? (
           <View style={{ marginTop: 8, gap: 6 }}>
             {attempts.map((a, i) => (
