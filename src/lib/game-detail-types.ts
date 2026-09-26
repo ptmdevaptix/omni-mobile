@@ -12,6 +12,10 @@ export type GoalInfo = {
   awayScore: number; homeScore: number; isShootout?: boolean;
 };
 export type ScoringPeriod = { label: string; goals: GoalInfo[] };
+/** One shootout attempt, in the order taken. `winner` marks the attempt that decided the game. */
+export type ShootoutAttempt = { teamAbbr: string; shooter: string; goalie?: string; scored: boolean; round: number; winner?: boolean };
+/** A game's shootout, when it had one. Goals here are shootout goals, not the one the winner is credited with. */
+export type Shootout = { awayGoals: number; homeGoals: number; attempts: ShootoutAttempt[] };
 export type PenaltyInfo = { time: string; teamAbbr: string; player: string; description: string; duration: number; isPenaltyShot?: boolean };
 export type PenaltyPeriod = { label: string; penalties: PenaltyInfo[] };
 export type ThreeStar = { star: number; name: string; teamAbbr: string; goals: number; assists: number; points: number };
@@ -52,6 +56,7 @@ export type GameDetail = {
   homeTeam: GDTeam;
   periodScores?: PeriodScore[];
   scoring: ScoringPeriod[];
+  shootout?: Shootout;
   penalties: PenaltyPeriod[];
   threeStars?: ThreeStar[];
   rosters?: GameRosters;

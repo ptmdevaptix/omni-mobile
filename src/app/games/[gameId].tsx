@@ -16,7 +16,7 @@ import { GamePreview } from '@/components/game-preview';
 import { GameRosters } from '@/components/game-rosters';
 import { useFollowedMatcher } from '@/lib/use-follows';
 import { fetchGameDetail } from '@/lib/game';
-import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo } from '@/lib/game-detail-types';
+import type { GameDetail, GDTeam, GoalInfo, PenaltyInfo, Shootout } from '@/lib/game-detail-types';
 import { composeTeamName } from '@/lib/team-name';
 import { formatGameTime, type TimeZoneMode } from '@/lib/game-time';
 import { useTheme } from '@/lib/theme';
@@ -244,7 +244,16 @@ function LineScore({ g }: { g: GameDetail }) {
       </View>
       {(['away', 'home'] as const).map((side) => {
         const team = side === 'away' ? g.awayTeam : g.homeTeam;
-        const total = cols.reduce((s, c) => s + (c[side] ?? 0), 0);
+        // The game's score, not the sum of the columns. The SO column holds shootout GOALS — Regina
+        // 3, Brandon 4 over nine rounds — but a shootout adds one goal to the winner and none to the
+        // loser, so summing it made a 3-2 final read 5-6. Summed only when no score was sent, and
+        // then with the shootout counted the way the final score counts it.
+        const other = side === 'away' ? 'home' : 'away';
+        const so = cols.find((c) => c.label === 'SO');
+        const total = typeof team.score === 'number'
+          ? team.score
+          : cols.filter((c) => c.label !== 'SO').reduce((s, c) => s + (c[side] ?? 0), 0)
+            + (so && (so[side] ?? 0) > (so[other] ?? 0) ? 1 : 0);
         return (
           <View key={side} style={styles.lsRow}>
             <Text style={[styles.lsTeam, { color: t.text, fontWeight: '600' }]}>{team.abbr}</Text>
@@ -274,6 +283,72 @@ function Upcoming({ g }: { g: GameDetail }) {
         g.preview.split(/\n\s*\n/).filter(Boolean).map((para, i) => (
           <Text key={i} style={{ color: t.text, fontSize: 14, lineHeight: 21, marginTop: i ? 10 : 0 }}>{para.trim()}</Text>
         ))
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The shootout: one line with the result, which a tap opens into every attempt — who shot, whether he
+ * scored, who stopped him — and closes again. One line because the result is what nearly everyone
+ * opened the game for; nine rounds of names would push the penalties and the box score a screen down.
+ * Misses are listed, not filtered out: who was stopped is most of what happens in a shootout.
+ */
+function ShootoutCard({ g, shootout }: { g: GameDetail; shootout: Shootout }) {
+  const t = useTheme();
+  const [open, setOpen] = useState(false);
+  const { attempts, awayGoals, homeGoals } = shootout;
+  const away = g.awayTeam.abbr, home = g.homeTeam.abbr;
+  const rounds = attempts.reduce((m, a) => Math.max(m, a.round), 0);
+  const final = g.status === 'FINAL';
+  const winner = awayGoals === homeGoals ? null : awayGoals > homeGoals ? away : home;
+  const result = final && winner
+    ? `${winner} wins ${Math.max(awayGoals, homeGoals)}–${Math.min(awayGoals, homeGoals)}`
+    : `${away} ${awayGoals}–${homeGoals} ${home}`;
+  const tail = rounds ? ` · ${rounds} round${rounds === 1 ? '' : 's'}` : '';
+  // The deciding attempt: the feed's own flag where it sets one; otherwise, once the game is over,
+  // the winner's goal in the last round — the one the other side could not answer.
+  const decided = attempts.some((a) => a.winner)
+    ? attempts.findIndex((a) => a.winner)
+    : final && winner ? attempts.map((a, i) => ({ a, i })).filter(({ a }) => a.round === rounds && a.teamAbbr === winner && a.scored).pop()?.i ?? -1 : -1;
+  const green = t.mode === 'dark' ? '#4ade80' : '#16a34a';
+  return (
+    <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`Shootout, ${result}${tail}. ${open ? 'Hide' : 'Show'} the attempts.`}
+        hitSlop={6}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+      >
+        <Text style={[styles.section, { color: t.sub, marginBottom: 0 }]}>SHOOTOUT</Text>
+        <Text style={{ color: t.text, fontSize: 14, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+          {result}<Text style={{ color: t.sub, fontWeight: '400' }}>{tail}</Text>
+        </Text>
+        {attempts.length ? <Text style={{ color: t.subtle, fontSize: 12 }}>{open ? '▾' : '▸'}</Text> : null}
+      </Pressable>
+      {open ? (
+        attempts.length ? (
+          <View style={{ marginTop: 8, gap: 6 }}>
+            {attempts.map((a, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ width: 18, color: t.subtle, fontSize: 11, fontVariant: ['tabular-nums'] }}>{a.round || ''}</Text>
+                <Text style={{ width: 14, color: a.scored ? green : t.subtle, fontSize: 12 }}>{a.scored ? '●' : '○'}</Text>
+                <Text style={{ width: 40, color: t.sub, fontSize: 11, fontWeight: '700' }}>{a.teamAbbr}</Text>
+                <Text style={{ flexShrink: 1, color: a.scored ? t.text : t.sub, fontSize: 13, fontWeight: a.scored ? '600' : '400' }} numberOfLines={1}>{a.shooter}</Text>
+                {i === decided ? <Text style={{ color: t.accent, fontSize: 10, fontWeight: '800' }}>WINNER</Text> : null}
+                <View style={{ flex: 1 }} />
+                {a.goalie && !a.scored ? <Text style={{ color: t.subtle, fontSize: 11 }} numberOfLines={1}>saved by {a.goalie}</Text> : null}
+              </View>
+            ))}
+            <Text style={{ color: t.subtle, fontSize: 11, marginTop: 4 }}>
+              {attempts[0].teamAbbr} shot first. Shootout goals do not count toward player totals.
+            </Text>
+          </View>
+        ) : (
+          <Text style={{ color: t.subtle, fontSize: 12, marginTop: 6 }}>Attempt details unavailable.</Text>
+        )
       ) : null}
     </View>
   );
@@ -311,6 +386,8 @@ function PlayedBody({ g }: { g: GameDetail }) {
           </View>
         )) : <Text style={{ color: t.subtle, fontSize: 13 }}>No scoring yet.</Text>}
       </View>
+
+      {g.shootout ? <ShootoutCard g={g} shootout={g.shootout} /> : null}
 
       {g.penalties?.some((p) => p.penalties.length) ? (
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
